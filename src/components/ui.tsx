@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { Tone } from '../constants'
+import { getSaveFailed, SAVE_FAILED_MESSAGE, subscribeSaveStatus } from '../store/AppStore'
 
 /* ---------------- Button ---------------- */
 
@@ -256,6 +257,11 @@ export function expireToast(slots: ToastSlots, id: number): ToastSlots {
   return slots
 }
 
+/** 저장 실패 오류 알림만 뺀다 (저장이 다시 성공하면 낡은 실패 안내를 지우기 위해) */
+export function dropSaveFailureToast(slots: ToastSlots): ToastSlots {
+  return slots.error && slots.error.message.includes(SAVE_FAILED_MESSAGE) ? { ...slots, error: null } : slots
+}
+
 /** 화면에 그릴 순서. 오류를 마지막에 둔다 (모달이 열려 하나만 보일 때 오류가 남도록, index.css 참고) */
 export function visibleToasts(slots: ToastSlots): ToastItem[] {
   return [slots.note, slots.error].filter((t): t is ToastItem => t !== null)
@@ -283,6 +289,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(t.error)
     }
   }, [])
+  // 저장이 다시 성공하면(재시도 등) 남아 있는 '저장하지 못했어요' 오류 알림을 지운다.
+  // 성공 알림과 실패 알림이 함께 떠 있지 않도록. 저장과 무관한 오류 알림은 그대로 둔다.
+  useEffect(
+    () =>
+      subscribeSaveStatus(() => {
+        if (!getSaveFailed()) setSlots(dropSaveFailureToast)
+      }),
+    [],
+  )
   return (
     <ToastCtx.Provider value={push}>
       {children}

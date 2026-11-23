@@ -4,7 +4,7 @@ import { WORK_MAP } from '../../constants'
 import { formatDateRange, formatDateShort, isValidTime, timezoneLabel } from '../../lib/date'
 import { getAddWarnings, hasDuplicateEvent, isDateInEventPeriod } from '../../lib/trip'
 import { isPermanentShop } from '../../lib/status'
-import { useStore } from '../../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../../store/AppStore'
 import { StatusBadges, WorkTags } from '../EventBits'
 import { Badge, Button, Chip, EmptyState, Field, Modal, Notice, SampleBadge, useToast } from '../ui'
 import { normalize } from './tripFormat'
@@ -65,7 +65,7 @@ export function AddEventModal({ trip, date, dayNo, onClose }: { trip: Trip; date
     ev.preventDefault()
     if (!selected) return
     if (time && !isValidTime(time)) return setTimeError('방문 시각 형식이 올바르지 않아요.')
-    store.addItineraryItem(trip.id, {
+    const added = store.addItineraryItem(trip.id, {
       date,
       kind: 'event',
       eventId: selected.id,
@@ -74,6 +74,8 @@ export function AddEventModal({ trip, date, dayNo, onClose }: { trip: Trip; date
       time: time || null,
       memo: memo.trim(),
     })
+    // 저장 실패: 추가되지 않았다 → 대화상자·선택·입력값을 그대로 둔다
+    if (!added) return toast(SAVE_FAILED_MESSAGE, 'error')
     toast(`${formatDateShort(date)} 일정에 추가했어요.`)
     onClose()
   }

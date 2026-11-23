@@ -2,7 +2,7 @@ import { useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { Trip, TripInput } from '../../types'
 import { COUNTRY_DEFAULT_TZ, REGION_SUGGESTIONS, TIMEZONES } from '../../constants'
 import { daysBetween, isValidDate, isValidTimezone } from '../../lib/date'
-import { useStore } from '../../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../../store/AppStore'
 import { Button, Field, Modal, Notice, useToast } from '../ui'
 import { MAX_TRIP_DAYS, tripLengthLabel } from './tripFormat'
 
@@ -116,12 +116,14 @@ export function TripFormModal({
       timezone: f.timezone,
       accommodation: { name: f.accName.trim(), address: f.accAddress.trim(), memo: f.accMemo.trim() },
     }
+    // 저장 실패: 여행은 만들어지거나 바뀌지 않았다 → 대화상자와 입력값을 그대로 두고, 화면도 옮기지 않는다
     if (trip) {
-      store.updateTrip(trip.id, input)
+      if (!store.updateTrip(trip.id, input)) return toast(SAVE_FAILED_MESSAGE, 'error')
       toast('저장했어요')
       onClose()
     } else {
       const created = store.createTrip(input)
+      if (!created) return toast(SAVE_FAILED_MESSAGE, 'error')
       toast('저장했어요')
       onClose()
       onCreated?.(created)

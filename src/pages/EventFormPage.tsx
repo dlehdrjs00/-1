@@ -24,7 +24,8 @@ import {
   type LoadedEventDraft,
 } from '../lib/eventDraft'
 import { goBack, Link, navigate, setNavigationGuard } from '../router'
-import { useStore } from '../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../store/AppStore'
+import { newId } from '../lib/id'
 import { Button, Chip, EmptyState, Field, Notice, PageHeader, useConfirm, useToast } from '../components/ui'
 import { FieldSet, FormSection } from '../components/manage/FormBits'
 import { useDeleteEvent } from '../components/manage/useDeleteEvent'
@@ -76,6 +77,7 @@ const DRAFT_SAVE_DELAY_MS = 400
  *   저장된 초안도 건드리지 않는다 (그대로 두면 빈 폼이 초안을 지워 버리므로).
  * - 저장·삭제 뒤, 또는 '나가기'로 입력을 버린 뒤에는 finish() 로 초안을 지우고 더는 저장하지 않는다.
  *   (선택을 기다리는 동안 폼은 inert 로 막아 둔다.)
+ *   저장·삭제가 실패하면 finish() 를 부르지 않고 flush() 로 지금 입력을 초안에 바로 보관한다.
  * - 새로고침/탭 닫기 경고(beforeunload)는 입력을 초안으로 보관하지 못한 경우(저장소를 쓸 수 없음)에만 켠다.
  */
 function useEventFormDraft({
@@ -193,7 +195,7 @@ function useEventFormDraft({
     clearEventDraft(target)
   }, [target])
 
-  return { offer, restore, discard, finish }
+  return { offer, restore, discard, finish, flush }
 }
 
 function DraftNotice({
@@ -332,8 +334,17 @@ function EventForm({ existing }: { existing?: EventItem }) {
     if (focusReq) focusField(focusReq.field)
   }, [focusReq, focusField])
 
+  // 새 행사 id 는 폼마다 한 번만 만든다: 저장에 실패한 뒤 다시 눌러도(또는 빠르게 두 번 눌러도) 같은 id 로
+  // 저장되므로 행사가 둘 생기지 않는다 (store.addEvent 는 같은 id 가 있으면 갱신한다).
+  const [newEventId] = useState(() => newId('evt'))
+  // 저장 처리 중·저장 성공 뒤(화면을 떠나는 중)에는 제출을 무시한다. 실패하면 다시 누를 수 있게 푼다.
+  const submitting = useRef(false)
+  // 마지막 저장 실패 안내 (n: 다시 실패할 때마다 새로 읽히도록 바꾸는 값)
+  const [saveFailure, setSaveFailure] = useState<{ n: number; draftKept: boolean; dirty: boolean } | null>(null)
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
+    if (submitting.current) return
     const bad = scanBadInputs()
     setBadInputErrors(bad)
     const errs = { ...validateEventForm(values), ...bad }
@@ -342,14 +353,23 @@ function EventForm({ existing }: { existing?: EventItem }) {
       setFocusReq((prev) => ({ field: orderedErrors(errs)[0].field, n: (prev?.n ?? 0) + 1 }))
       return
     }
+    submitting.current = true
     const input = formToEventInput(values, existing?.isSample ?? false)
-    let savedId: string
-    if (existing) {
-      store.updateEvent(existing.id, input)
-      savedId = existing.id
-    } else {
-      savedId = store.addEvent(input).id
+    const savedId = existing
+      ? store.updateEvent(existing.id, input)
+        ? existing.id
+        : null
+      : (store.addEvent(input, { id: newEventId })?.id ?? null)
+    if (savedId === null) {
+      // 저장 실패: 폼·입력값·초안을 그대로 두고(초안은 지금 입력으로 바로 보관), 성공 안내·화면 이동은 하지 않는다.
+      // 이동 확인(나가기 전에 묻기)도 그대로 유지된다.
+      submitting.current = false
+      const draftKept = draft.flush()
+      setSaveFailure((prev) => ({ n: (prev?.n ?? 0) + 1, draftKept, dirty }))
+      toast(SAVE_FAILED_MESSAGE, 'error')
+      return
     }
+    setSaveFailure(null)
     finishDraft()
     toast('저장했어요')
     releaseGuard.current?.()
@@ -377,9 +397,13 @@ function EventForm({ existing }: { existing?: EventItem }) {
 
   const onDelete = async () => {
     if (!existing) return
-    if (await deleteEvent(existing)) {
+    const result = await deleteEvent(existing)
+    if (result === 'deleted') {
       finishDraft()
       navigate('/manage', { replace: true })
+    } else if (result === 'failed') {
+      // 삭제를 저장하지 못함 (오류 안내는 useDeleteEvent 가 한다): 이 화면과 입력·초안을 그대로 둔다
+      draft.flush()
     }
   }
 
@@ -846,6 +870,18 @@ function EventForm({ existing }: { existing?: EventItem }) {
         </FormSection>
 
       </form>
+
+      {/* 저장 실패 안내: 저장 바 바로 위. 다음 저장이 성공하면 사라진다 (다시 실패하면 새로 읽힌다). */}
+      {saveFailure && (
+        <Notice key={saveFailure.n} tone="danger" title={isEdit ? '변경 내용이 저장되지 않았어요' : '행사가 등록되지 않았어요'}>
+          {SAVE_FAILED_MESSAGE}{' '}
+          {!saveFailure.dirty
+            ? '입력한 내용은 그대로 남아 있어요.'
+            : saveFailure.draftKept
+              ? '입력한 내용과 초안은 그대로 남아 있어요.'
+              : '입력한 내용은 화면에 남아 있지만 초안으로 보관하지 못했어요. 이 화면을 닫거나 벗어나면 사라질 수 있어요.'}
+        </Notice>
+      )}
 
       {/* 저장 바는 form 밖(.ef-page 직속)에 둔다: sticky 요소는 자기 컨테이너 위로 올라갈 수 없어서,
           form 안에 있으면 짧은 화면에서 위쪽 안내문 때문에 하단 메뉴 아래로 일부 가려졌다. */}

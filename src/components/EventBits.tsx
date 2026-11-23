@@ -8,7 +8,7 @@ import {
   WORK_MAP,
 } from '../constants'
 import { getEventStatus, getReservationStatus } from '../lib/status'
-import { useStore } from '../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../store/AppStore'
 import { Badge, useToast } from './ui'
 
 export function WorkTags({ works }: { works: WorkId[] }) {
@@ -77,6 +77,8 @@ export function FavoriteButton({ eventId, compact }: { eventId: string; compact?
         e.preventDefault()
         e.stopPropagation()
         const on = store.toggleFavorite(eventId)
+        // 저장에 실패하면 관심 여부는 그대로다 → 성공 안내 없이 오류만 알린다
+        if (on === null) return toast(SAVE_FAILED_MESSAGE, 'error')
         toast(on ? '관심 행사에 저장했어요.' : '관심 저장을 취소했어요.', on ? 'success' : 'info')
       }}
     >

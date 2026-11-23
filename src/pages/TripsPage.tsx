@@ -3,7 +3,7 @@ import type { DateOnly, ItineraryItem } from '../types'
 import { formatDateShort } from '../lib/date'
 import { itemsOutsideTrip, tripDates } from '../lib/trip'
 import { Link, navigate } from '../router'
-import { useStore } from '../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../store/AppStore'
 import { Button, Chip, EmptyState, Notice, PageHeader, useConfirm, useToast } from '../components/ui'
 import { TripFormModal } from '../components/trips/TripFormModal'
 import { TripSummary } from '../components/trips/TripSummary'
@@ -31,6 +31,8 @@ export default function TripsPage({ tripId }: { tripId?: string }) {
 
   // 주소로 직접 연 여행을 활성 여행으로 (다른 화면의 '여행에 추가' 기본값과 맞추기 위해).
   // 경로가 바뀔 때 한 번만 맞춘다 — 다른 탭과 activeTripId 를 서로 덮어쓰는 무한 반복을 막기 위해.
+  // 저장에 실패해도 조용히 넘어간다: 보기만 하는 동작이라 알림을 띄우지 않고, syncedFor 를 먼저 적어 두므로
+  // 실패한 뒤 다시 그려져도 같은 경로에서는 다시 시도하지 않는다 (실패 시 데이터가 바뀌지 않아 다시 그려지지도 않는다).
   const syncedFor = useRef<string | null>(null)
   const tripFound = !!trip
   const setActiveTrip = store.setActiveTrip
@@ -38,7 +40,7 @@ export default function TripsPage({ tripId }: { tripId?: string }) {
   useEffect(() => {
     if (!tripId || !tripFound || syncedFor.current === tripId) return
     syncedFor.current = tripId
-    if (activeTripId !== tripId) setActiveTrip(tripId)
+    if (activeTripId !== tripId) void setActiveTrip(tripId)
   }, [tripId, tripFound, activeTripId, setActiveTrip])
 
   // 순서 바꾸기 후 버튼 포커스 유지 (키보드 사용자용)
@@ -111,7 +113,11 @@ export default function TripsPage({ tripId }: { tripId?: string }) {
 
   const onMove = (item: ItineraryItem, dir: -1 | 1) => {
     pendingFocus.current = { id: item.id, dir }
-    store.moveItineraryItem(trip.id, item.id, dir)
+    if (!store.moveItineraryItem(trip.id, item.id, dir)) {
+      // 저장 실패: 순서는 그대로다. 다음에 다시 그릴 때 엉뚱하게 포커스를 옮기지 않도록 지운다
+      pendingFocus.current = null
+      toast(SAVE_FAILED_MESSAGE, 'error')
+    }
   }
 
   const onDeleteItem = async (item: ItineraryItem) => {
@@ -122,7 +128,7 @@ export default function TripsPage({ tripId }: { tripId?: string }) {
       danger: true,
     })
     if (!ok) return
-    store.removeItineraryItem(trip.id, item.id)
+    if (!store.removeItineraryItem(trip.id, item.id)) return toast(`${SAVE_FAILED_MESSAGE} 일정은 삭제되지 않았어요.`, 'error')
     toast('일정을 삭제했어요.', 'info')
   }
 
@@ -140,15 +146,15 @@ export default function TripsPage({ tripId }: { tripId?: string }) {
       danger: true,
     })
     if (!ok) return
-    store.deleteTrip(trip.id)
+    // 저장 실패: 여행은 그대로 남아 있다 → 이 화면에 머문다
+    if (!store.deleteTrip(trip.id)) return toast(`${SAVE_FAILED_MESSAGE} 여행은 삭제되지 않았어요.`, 'error')
     toast('여행을 삭제했어요.', 'info')
     navigate('/trips', { replace: true })
   }
 
-  const selectTrip = (id: string) => {
-    store.setActiveTrip(id)
-    navigate(`/trips/${encodeURIComponent(id)}`)
-  }
+  // 여행 전환은 '보기' 동작이라 저장 성공과 무관하게 이동한다.
+  // 활성 여행 저장은 경로 effect 가 조용히 시도한다 (실패하면 상단 저장 실패 안내만 보인다).
+  const selectTrip = (id: string) => navigate(`/trips/${encodeURIComponent(id)}`)
 
   return (
     <div className="tp-page">

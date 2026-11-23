@@ -105,6 +105,50 @@ describe('ops', () => {
     expect(ops.updateEvent(d, 'evt_none', input()).events).toEqual(d.events)
   })
 
+  it('upsertEvent inserts (prepended, like addEvent) when the id is new', () => {
+    const d0 = ops.addEvent(emptyData(), input({ title: 'A' }), 'evt_a')
+    const d1 = ops.upsertEvent(d0, input({ title: 'N' }), 'evt_new')
+    expect(d1.events.map((e) => e.id)).toEqual(['evt_new', 'evt_a'])
+    expect(d1.events[0]).toMatchObject({ id: 'evt_new', title: 'N', createdAt: T0, updatedAt: T0 })
+    // input data is not mutated
+    expect(d0.events.map((e) => e.id)).toEqual(['evt_a'])
+  })
+
+  it('upsertEvent updates in place when the id exists: keeps createdAt and position, bumps updatedAt', () => {
+    let d = ops.upsertEvent(emptyData(), input({ title: 'A' }), 'evt_a')
+    d = ops.addEvent(d, input({ title: 'B' }), 'evt_b')
+    const bBefore = d.events.find((e) => e.id === 'evt_b')
+    vi.setSystemTime(new Date('2026-11-24T09:00:00.000Z'))
+    const d2 = ops.upsertEvent(d, input({ title: 'A2', city: '오사카' }), 'evt_a')
+    expect(d2.events.map((e) => e.id)).toEqual(['evt_b', 'evt_a'])
+    expect(d2.events[1]).toMatchObject({
+      id: 'evt_a',
+      title: 'A2',
+      city: '오사카',
+      createdAt: T0,
+      updatedAt: '2026-11-24T09:00:00.000Z',
+    })
+    expect(d2.events[0]).toBe(bBefore)
+    expect(d.events.find((e) => e.id === 'evt_a')?.title).toBe('A')
+  })
+
+  it('upsertEvent never duplicates the event, even when called 3 times with the same id', () => {
+    let d = ops.addEvent(emptyData(), input({ title: 'other' }), 'evt_other')
+    for (let i = 1; i <= 3; i++) {
+      vi.setSystemTime(new Date(Date.parse(T0) + i * 60_000))
+      d = ops.upsertEvent(d, input({ title: `try ${i}` }), 'evt_once')
+    }
+    expect(d.events).toHaveLength(2)
+    const hits = d.events.filter((e) => e.id === 'evt_once')
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toMatchObject({
+      title: 'try 3',
+      // created on the first call, updated on the last
+      createdAt: new Date(Date.parse(T0) + 60_000).toISOString(),
+      updatedAt: new Date(Date.parse(T0) + 3 * 60_000).toISOString(),
+    })
+  })
+
   it('deleteEvents removes the events, their favorites and itinerary references only', () => {
     let d = emptyData()
     d = ops.addEvent(d, input({ title: 'A' }), 'evt_a')

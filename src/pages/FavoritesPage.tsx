@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { EventItem } from '../types'
 import { Link } from '../router'
-import { useStore } from '../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../store/AppStore'
 import { AddToTripDialog } from '../components/AddToTripDialog'
 import { StatusBadges, TypeLabel, WorkTags } from '../components/EventBits'
 import { EventCardMeta } from '../components/events/EventCard'
@@ -49,7 +49,8 @@ export default function FavoritesPage() {
   const unsave = (e: EventItem) => {
     const index = store.data.favorites.indexOf(e.id)
     if (index < 0) return
-    store.toggleFavorite(e.id)
+    // 저장 실패: 관심 목록은 그대로다 → 취소 안내·되돌리기를 띄우지 않는다
+    if (store.toggleFavorite(e.id) === null) return toast(SAVE_FAILED_MESSAGE, 'error')
     setRemoved({ id: e.id, index, title: e.title })
     toast('관심 저장을 취소했어요.', 'info')
   }
@@ -64,7 +65,8 @@ export default function FavoritesPage() {
     // 원래 순서 위치로 되돌린다
     const favorites = [...cur.favorites]
     favorites.splice(Math.min(removed.index, favorites.length), 0, removed.id)
-    store.replaceAll({ ...cur, favorites })
+    // 저장 실패: 되살리지 못했다 → 되돌리기 안내를 남겨 다시 시도할 수 있게 한다
+    if (!store.replaceAll({ ...cur, favorites })) return toast(`${SAVE_FAILED_MESSAGE} 관심 행사는 아직 되살리지 못했어요.`, 'error')
     setRemoved(null)
     toast('다시 저장했어요.')
   }

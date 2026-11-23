@@ -1,5 +1,5 @@
 import { useCallback, useId, useState } from 'react'
-import { useStore } from '../../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../../store/AppStore'
 import { clearAllEventDrafts } from '../../lib/eventDraft'
 import { Button, Field, Modal, useToast } from '../ui'
 import { dataCounts, downloadBackup } from './backup'
@@ -26,8 +26,9 @@ export function ResetSection({ headingId }: { headingId: string }) {
 
   const doReset = () => {
     if (!canReset) return
-    store.resetAll()
-    // 저장하지 않은 행사 등록·수정 초안도 모두 지운다
+    // 저장 실패: 데이터는 그대로다 → 대화상자를 열어 둔 채 오류만 알리고, 초안도 지우지 않는다
+    if (!store.resetAll()) return toast(`${SAVE_FAILED_MESSAGE} 데이터는 초기화되지 않았어요.`, 'error')
+    // 초기화가 저장된 뒤에만 저장하지 않은 행사 등록·수정 초안도 모두 지운다
     clearAllEventDrafts()
     close()
     toast('모든 데이터를 초기화했어요.')

@@ -1,5 +1,5 @@
 import { useId, useState, type ChangeEvent } from 'react'
-import { useStore } from '../../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../../store/AppStore'
 import { Button, Notice, useConfirm, useToast } from '../ui'
 import { dataCounts, downloadBackup, readBackupFile } from './backup'
 
@@ -10,7 +10,10 @@ export function BackupSection({ headingId }: { headingId: string }) {
   const confirm = useConfirm()
   const inputId = useId()
   const descId = useId()
-  const [importErrors, setImportErrors] = useState<{ fileName: string; errors: string[] } | null>(null)
+  /** 불러오기 실패 안내. invalid: 파일 내용 문제, save: 검증은 통과했지만 저장하지 못함 (둘 다 기존 데이터는 그대로) */
+  const [importErrors, setImportErrors] = useState<{ fileName: string; reason: 'invalid' | 'save'; errors: string[] } | null>(
+    null,
+  )
   const [busy, setBusy] = useState(false)
   const cur = dataCounts(store.data)
 
@@ -35,7 +38,7 @@ export function BackupSection({ headingId }: { headingId: string }) {
       const res = await readBackupFile(file)
       if (!res.ok) {
         // 기존 데이터는 건드리지 않는다
-        setImportErrors({ fileName: file.name, errors: res.errors })
+        setImportErrors({ fileName: file.name, reason: 'invalid', errors: res.errors })
         return
       }
       const next = dataCounts(res.data)
@@ -66,7 +69,12 @@ export function BackupSection({ headingId }: { headingId: string }) {
         toast('불러오기를 취소했어요. 기존 데이터는 그대로예요.', 'info')
         return
       }
-      store.replaceAll(res.data)
+      if (!store.replaceAll(res.data)) {
+        // 저장 실패: 아무것도 바뀌지 않았다 → '불러오기 완료'를 띄우지 않고, 기존 데이터가 그대로임을 알린다
+        setImportErrors({ fileName: file.name, reason: 'save', errors: [] })
+        toast(`${SAVE_FAILED_MESSAGE} 기존 데이터는 그대로예요.`, 'error')
+        return
+      }
       toast(`불러오기 완료: 행사 ${next.events}개, 관심 ${next.favorites}개, 여행 ${next.trips}개`)
     } finally {
       setBusy(false)
@@ -118,14 +126,23 @@ export function BackupSection({ headingId }: { headingId: string }) {
       {importErrors && (
         <Notice tone="danger" title="불러오지 못했어요">
           <div className="stack manage-import-error">
-            <p>
-              ‘{importErrors.fileName}’ 파일에 문제가 있어요. <strong>기존 데이터는 그대로 유지됩니다.</strong>
-            </p>
-            <ul className="plain-list">
-              {importErrors.errors.map((msg, i) => (
-                <li key={i}>{msg}</li>
-              ))}
-            </ul>
+            {importErrors.reason === 'save' ? (
+              <p>
+                ‘{importErrors.fileName}’ 내용을 이 브라우저에 저장하지 못해 바꾸지 않았어요.{' '}
+                <strong>기존 데이터는 그대로 유지됩니다.</strong> {SAVE_FAILED_MESSAGE}
+              </p>
+            ) : (
+              <>
+                <p>
+                  ‘{importErrors.fileName}’ 파일에 문제가 있어요. <strong>기존 데이터는 그대로 유지됩니다.</strong>
+                </p>
+                <ul className="plain-list">
+                  {importErrors.errors.map((msg, i) => (
+                    <li key={i}>{msg}</li>
+                  ))}
+                </ul>
+              </>
+            )}
             <div>
               <button type="button" className="link-btn" onClick={() => setImportErrors(null)}>
                 닫기

@@ -54,7 +54,7 @@ export function loadFromStorage(): { data: AppData; notice: LoadNotice; corruptR
  * (저장은 변경 직후·첫 화면 표시 때 일어나는 부수 효과이므로, effect 안에서 setState 를 부르지 않기 위해)
  */
 const saveStatus = { failed: false, listeners: new Set<() => void>() }
-function subscribeSaveStatus(fn: () => void) {
+export function subscribeSaveStatus(fn: () => void) {
   saveStatus.listeners.add(fn)
   return () => {
     saveStatus.listeners.delete(fn)

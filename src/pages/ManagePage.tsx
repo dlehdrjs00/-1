@@ -2,12 +2,12 @@ import { useId, useMemo, useState } from 'react'
 import type { EventItem } from '../types'
 import { EVENT_TYPE_MAP, WORK_MAP } from '../constants'
 import { Link } from '../router'
-import { useStore } from '../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../store/AppStore'
 import { clearEventDraftsFor } from '../lib/eventDraft'
 import { Button, EmptyState, PageHeader, SampleBadge, useConfirm, useToast } from '../components/ui'
 import { TypeLabel, WorkTags } from '../components/EventBits'
 import { PeriodText } from '../components/events/EventText'
-import { useDeleteEvent } from '../components/manage/useDeleteEvent'
+import { useDeleteEvent, type DeleteEventResult } from '../components/manage/useDeleteEvent'
 import { BackupSection } from '../components/manage/BackupSection'
 import { ResetSection } from '../components/manage/ResetSection'
 import './manage.css'
@@ -37,7 +37,7 @@ function placeText(e: EventItem): string {
   return [e.city, e.country].map((s) => s.trim()).filter(Boolean).join(', ')
 }
 
-function ManageEventRow({ event, onDelete }: { event: EventItem; onDelete: (e: EventItem) => void }) {
+function ManageEventRow({ event, onDelete }: { event: EventItem; onDelete: (e: EventItem) => Promise<DeleteEventResult> }) {
   const place = placeText(event)
   return (
     <li className="manage-event">
@@ -68,7 +68,7 @@ function ManageEventRow({ event, onDelete }: { event: EventItem; onDelete: (e: E
         >
           수정
         </Link>
-        <Button size="sm" variant="danger" onClick={() => onDelete(event)} aria-label={`${event.title} 삭제`}>
+        <Button size="sm" variant="danger" onClick={() => void onDelete(event)} aria-label={`${event.title} 삭제`}>
           삭제
         </Button>
       </div>
@@ -135,7 +135,9 @@ export default function ManagePage() {
     if (!ok) return
     const sampleIds = samples.map((e) => e.id)
     const n = store.deleteSamples()
-    // 삭제한 샘플의 저장하지 않은 수정 초안도 지운다
+    // 저장 실패: 샘플은 그대로 남아 있다 → 성공 안내 없이, 샘플 수정 초안도 지우지 않는다
+    if (n === null) return toast(`${SAVE_FAILED_MESSAGE} 샘플 행사는 삭제되지 않았어요.`, 'error')
+    // 삭제가 저장된 뒤에만 삭제한 샘플의 저장하지 않은 수정 초안을 지운다
     clearEventDraftsFor(sampleIds)
     toast(`샘플 행사 ${n}개를 삭제했어요.`)
   }

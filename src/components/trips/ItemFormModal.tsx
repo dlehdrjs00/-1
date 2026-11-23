@@ -2,7 +2,7 @@ import { useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { DateOnly, ItineraryItem, Trip } from '../../types'
 import { formatDate, formatDateRange, formatDateShort, isValidTime, timezoneLabel } from '../../lib/date'
 import { getAddWarnings, isDateInEventPeriod, tripDates, hasDuplicateEvent } from '../../lib/trip'
-import { useStore } from '../../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../../store/AppStore'
 import { Button, Field, Modal, Notice, SampleBadge, useToast } from '../ui'
 
 /**
@@ -58,23 +58,22 @@ export function ItemFormModal({
       return
     }
     const base = { date, time: time || null, memo: memo.trim() }
-    if (item) {
-      store.updateItineraryItem(
-        trip.id,
-        item.id,
-        kind === 'place' ? { ...base, placeName: placeName.trim(), placeAddress: placeAddress.trim() } : base,
-      )
-      toast('저장했어요')
-    } else {
-      store.addItineraryItem(trip.id, {
-        ...base,
-        kind: 'place',
-        eventId: null,
-        placeName: placeName.trim(),
-        placeAddress: placeAddress.trim(),
-      })
-      toast(`${formatDateShort(date)} 일정에 추가했어요.`)
-    }
+    const saved = item
+      ? store.updateItineraryItem(
+          trip.id,
+          item.id,
+          kind === 'place' ? { ...base, placeName: placeName.trim(), placeAddress: placeAddress.trim() } : base,
+        )
+      : !!store.addItineraryItem(trip.id, {
+          ...base,
+          kind: 'place',
+          eventId: null,
+          placeName: placeName.trim(),
+          placeAddress: placeAddress.trim(),
+        })
+    // 저장 실패: 바뀐 것이 없다 → 대화상자와 입력값을 그대로 두고 다시 시도할 수 있게 한다
+    if (!saved) return toast(SAVE_FAILED_MESSAGE, 'error')
+    toast(item ? '저장했어요' : `${formatDateShort(date)} 일정에 추가했어요.`)
     onClose()
   }
 

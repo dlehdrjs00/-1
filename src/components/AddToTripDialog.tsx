@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EventItem } from '../types'
-import { useStore } from '../store/AppStore'
+import { SAVE_FAILED_MESSAGE, useStore } from '../store/AppStore'
 import { formatDateRange, formatDateShort, isValidTime, timezoneLabel } from '../lib/date'
 import { getAddWarnings, tripDates, tripDatesWithinEvent } from '../lib/trip'
 import { navigate } from '../router'
@@ -75,7 +75,7 @@ export function AddToTripDialog({ event, open, onClose }: { event: EventItem; op
     if (!trip) return setError('여행을 선택하세요.')
     if (!date) return setError('날짜를 선택하세요.')
     if (time && !isValidTime(time)) return setError('방문 시각 형식이 올바르지 않습니다.')
-    store.addItineraryItem(trip.id, {
+    const added = store.addItineraryItem(trip.id, {
       date,
       kind: 'event',
       eventId: event.id,
@@ -84,6 +84,8 @@ export function AddToTripDialog({ event, open, onClose }: { event: EventItem; op
       time: time || null,
       memo: memo.trim(),
     })
+    // 저장 실패: 일정은 추가되지 않았다 → 대화상자와 입력값을 그대로 두고 다시 시도할 수 있게 한다
+    if (!added) return toast(SAVE_FAILED_MESSAGE, 'error')
     toast(`'${trip.name}' ${formatDateShort(date)} 일정에 추가했어요.`)
     onClose()
   }
