@@ -33,17 +33,29 @@ export function TypeLabel({ event }: { event: Pick<EventItem, 'type'> }) {
   )
 }
 
-/** 진행 상태와 예약 상태를 각각 별도 배지로 표시 */
+/**
+ * 진행 상태와 예약 상태를 각각 별도 배지로 표시.
+ * 라벨('진행 중', '예약 접수 중' 등)이 이미 스스로 설명되므로 접두어를 겹쳐 쓰지 않고,
+ * 두 종류는 아이콘(📅 진행 / 🎫 예약)으로 구분한다. 화면 낭독기에는 '진행 상태:' 등을 읽어 준다.
+ */
 export function StatusBadges({ event, now }: { event: EventItem; now?: Date }) {
   const s = getEventStatus(event, now)
   const r = getReservationStatus(event, now)
   return (
     <span className="status-badges">
       <Badge tone={EVENT_STATUS_TONE[s]} title="행사 진행 상태">
-        <span className="badge__k">진행</span> {EVENT_STATUS_LABEL[s]}
+        <span className="badge__icon" aria-hidden>
+          📅
+        </span>
+        <span className="sr-only">진행 상태: </span>
+        {EVENT_STATUS_LABEL[s]}
       </Badge>
       <Badge tone={RESERVATION_STATUS_TONE[r]} title="예약 상태">
-        <span className="badge__k">예약</span> {RESERVATION_STATUS_LABEL[r]}
+        <span className="badge__icon" aria-hidden>
+          🎫
+        </span>
+        <span className="sr-only">예약 상태: </span>
+        {RESERVATION_STATUS_LABEL[r]}
       </Badge>
     </span>
   )

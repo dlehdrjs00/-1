@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { EventItem } from '../types'
-import { formatDateRange } from '../lib/date'
 import { Link } from '../router'
 import { useStore } from '../store/AppStore'
 import { AddToTripDialog } from '../components/AddToTripDialog'
 import { StatusBadges, TypeLabel, WorkTags } from '../components/EventBits'
+import { EventCardMeta } from '../components/events/EventCard'
 import { Button, EmptyState, Notice, PageHeader, SampleBadge, useToast } from '../components/ui'
 import { monthDay } from '../components/trips/tripFormat'
+import './events.css'
 import './trips.css'
 
 interface Removed {
@@ -106,35 +107,37 @@ export default function FavoritesPage() {
         <ul className="favs-list">
           {events.map((e) => {
             const dates = addedDates.get(e.id)
-            const place = [e.venue, e.city].filter((s) => s && s.trim()).join(' · ')
             return (
-              <li key={e.id} className="card favs-card">
-                <div className="favs-card__top">
-                  <TypeLabel event={e} />
-                  {e.isSample && <SampleBadge />}
+              // 목록 카드(EventCard)와 같은 모양: 작품·유형 → 제목 → 기간·장소 → 상태 배지
+              <li key={e.id} className="card ev-card favs-card">
+                <div className="ev-card__top">
+                  <div className="ev-card__tags">
+                    <WorkTags works={e.works} />
+                    <TypeLabel event={e} />
+                  </div>
                 </div>
-                <h2 className="favs-card__title">
-                  <Link to={`/events/${e.id}`}>{e.title}</Link>
+                <h2 className="ev-card__title">
+                  <Link to={`/events/${encodeURIComponent(e.id)}`} className="ev-card__link">
+                    {e.title}
+                  </Link>
+                  {e.isSample && (
+                    <>
+                      {' '}
+                      <SampleBadge />
+                    </>
+                  )}
                 </h2>
-                <WorkTags works={e.works} />
-                <dl className="favs-meta">
-                  <div>
-                    <dt>기간</dt>
-                    <dd>{formatDateRange(e.startDate, e.endDate)}</dd>
-                  </div>
-                  <div>
-                    <dt>장소</dt>
-                    <dd>{place || <span className="unknown">확인 필요</span>}</dd>
-                  </div>
-                </dl>
-                <StatusBadges event={e} />
+                <EventCardMeta event={e} />
+                <div className="ev-card__status">
+                  <StatusBadges event={e} />
+                </div>
                 {activeTrip && dates && dates.length > 0 && (
                   <p className="favs-added">
                     <span aria-hidden>✓</span>{' '}
-                    <Link to={`/trips/${activeTrip.id}`}>
+                    <Link to={`/trips/${encodeURIComponent(activeTrip.id)}`}>
                       일정에 추가됨: {dates.map(monthDay).join(', ')}
                     </Link>
-                    <span className="faint"> · {activeTrip.name}</span>
+                    <span className="favs-added__trip"> · {activeTrip.name}</span>
                   </p>
                 )}
                 <div className="favs-card__actions">

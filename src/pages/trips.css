@@ -104,7 +104,6 @@
 .tp-stat--btn { cursor: pointer; min-height: 36px; padding-block: 6px; }
 .tp-stat--btn:hover { background: var(--warning-soft); }
 
-.tp-summary__info > div { grid-template-columns: 5.5em minmax(0, 1fr); }
 .tp-acc__memo { white-space: pre-wrap; color: var(--text-muted); }
 
 .tp-tz-note {
@@ -349,8 +348,6 @@
 /* 플렉스 세로 배치 안에서 작품 태그가 가로로 늘어나지 않게 */
 .tp-form__event > .work-tags,
 .tp-form__event > .work-tag,
-.favs-card > .work-tags,
-.favs-card > .work-tag,
 .tp-pick > .work-tag { align-self: flex-start; }
 
 .tp-pick__title { font-weight: 700; font-size: 0.9375rem; line-height: 1.4; }
@@ -369,20 +366,15 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
-@media (min-width: 768px) {
+/* 행사 목록(.ev-list)과 같은 폭에서 두 칸 */
+@media (min-width: 720px) {
   .favs-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-.favs-card { display: flex; flex-direction: column; gap: 10px; }
-.favs-card__top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.favs-card__title { font-size: 1.0625rem; line-height: 1.4; }
-.favs-card__title a { color: var(--text); }
-.favs-card__title a::after { content: ' ›'; color: var(--text-faint); }
-.favs-card__title a:hover { color: var(--accent-text); }
-
-.favs-meta { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; }
-.favs-meta > div { display: grid; grid-template-columns: 2.75em minmax(0, 1fr); gap: 8px; }
-.favs-meta dt { color: var(--text-faint); font-weight: 600; }
-.favs-meta dd { margin: 0; min-width: 0; color: var(--text-muted); }
+/* 카드 모양은 행사 목록 카드(.ev-card, events.css)를 그대로 쓰고, 관심 화면 전용 부분만 덧붙인다 */
+.favs-card .ev-card__status { margin-top: 0; }
+/* 카드 전체 링크(제목 ::after) 위에 놓이는 요소 */
+.favs-added,
+.favs-card__actions { position: relative; z-index: 1; }
 
 .favs-added {
   padding: 8px 10px;
@@ -393,6 +385,7 @@
   font-weight: 600;
 }
 .favs-added a { color: var(--success); text-decoration: underline; text-underline-offset: 2px; }
+.favs-added__trip { color: var(--text-muted); font-weight: 500; }
 
 .favs-card__actions {
   margin-top: auto;

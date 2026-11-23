@@ -10,7 +10,8 @@
 .ev-url { word-break: break-all; overflow-wrap: anywhere; }
 .ev-url__ext { color: var(--text-faint); }
 
-@media (min-width: 768px) {
+/* 필터 패널을 접었다 펼치는 화면(1023px 이하)에서만 보이는 요소 */
+@media (min-width: 1024px) {
   .ev-only-mobile { display: none !important; }
 }
 
@@ -27,11 +28,11 @@
 .ev-count {
   display: inline-grid; place-items: center;
   min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
-  background: var(--accent); color: white; font-size: 0.75rem; font-weight: 700; line-height: 1;
+  background: var(--accent-strong); color: white; font-size: 0.75rem; font-weight: 700; line-height: 1;
 }
 .ev-chevron { font-size: 0.75rem; transition: transform 0.15s; }
 .ev-filter-toggle.is-open .ev-chevron { transform: rotate(180deg); }
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .ev-filter-toggle { display: none; }
 }
 
@@ -47,7 +48,7 @@
 /* ---------------- 필터 패널 ---------------- */
 .ev-filters { display: none; flex-direction: column; gap: 18px; }
 .ev-filters.is-open { display: flex; }
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .ev-filters { display: flex; }
 }
 
@@ -56,13 +57,15 @@
 .ev-fset__n { margin-left: 4px; font-size: 0.75rem; font-weight: 600; color: var(--accent-text); }
 
 .ev-filters .chip { min-height: var(--tap); }
-@media (min-width: 768px) {
-  .ev-filters .chip { min-height: 38px; }
+@media (min-width: 1024px) {
+  /* 사이드바(마우스 위주 화면)에서는 칩을 조금 낮게 해 한 화면에 더 많이 보이게 */
+  .ev-filters .chip { min-height: 32px; padding: 0 10px; }
 }
 .ev-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dot-color, var(--accent)); }
 
 .ev-filters__grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 768px) {
+/* 태블릿: 펼친 패널 안에서 지역 | 날짜 두 칸. 1024px 이상은 좁은 사이드바라 다시 한 칸 */
+@media (min-width: 768px) and (max-width: 1023px) {
   .ev-filters__grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); align-items: start; }
 }
 
@@ -101,8 +104,44 @@
   padding-top: 12px; border-top: 1px solid var(--border);
 }
 .ev-filters__foot .btn--primary { flex: 1 1 auto; }
-@media (min-width: 768px) {
+@media (min-width: 768px) and (max-width: 1023px) {
   .ev-filters__foot { justify-content: flex-end; }
+  .ev-filters__foot .btn--primary { flex: 0 0 auto; }
+}
+
+/* ---------------- 넓은 화면: 왼쪽 필터 사이드바 + 오른쪽 목록 ----------------
+   DOM 순서: 머리말 · 검색 · (요약) · 필터 · 결과 줄 · 목록(또는 빈 상태) · 정렬 안내
+   필터가 있는 행사 목록 화면에만 적용 (상세 화면도 .ev-page 를 쓰므로 :has 로 한정) */
+@media (min-width: 1024px) {
+  .ev-page:has(> .ev-filters) {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    /* 머리말 · 검색 · 결과 줄 · 목록 · 정렬 안내(남는 높이) */
+    grid-template-rows: auto auto auto auto 1fr;
+    column-gap: 24px;
+    row-gap: 16px;
+    align-items: start;
+  }
+  .ev-page:has(> .ev-filters) > * { grid-column: 2; min-width: 0; }
+  .ev-page:has(> .ev-filters) > .page-header { grid-column: 1 / -1; }
+  .ev-page > .ev-filters {
+    grid-column: 1;
+    grid-row: 2 / span 4;
+    position: sticky;
+    top: calc(var(--topbar-h) + 16px);
+    max-height: calc(100vh - var(--topbar-h) - 32px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+    gap: 16px;
+  }
+  .ev-filters .ev-fset__legend { margin-bottom: 6px; }
+  .ev-filters__foot { padding-top: 10px; }
+  .ev-filters__foot .btn { flex: 1 1 auto; }
+  .ev-page > .ev-resultbar { min-height: 0; }
+  .ev-page > .ev-sortnote { text-align: left; padding-inline: 0; }
+  /* 오른쪽 칸(약 620px)에서는 카드 한 줄에 하나: 두 칸이면 기간·장소가 줄마다 꺾인다 */
+  .ev-page:has(> .ev-filters) > .ev-list { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---------------- 결과 ---------------- */
@@ -142,12 +181,13 @@
 .ev-card__link:focus-visible { outline: none; }
 .ev-card__link:focus-visible::after { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 
+/* 항목명 칸을 고정 폭으로 두어 카드끼리 값의 시작 위치를 맞춘다 ('예약 마감'까지 한 줄) */
 .ev-card__meta {
-  display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px;
+  display: grid; grid-template-columns: 4.75em minmax(0, 1fr); gap: 4px 10px;
   margin: 0; font-size: 0.875rem;
 }
 .ev-card__meta > div { display: contents; }
-.ev-card__meta dt { color: var(--text-faint); font-size: 0.8125rem; font-weight: 600; padding-top: 1px; }
+.ev-card__meta dt { color: var(--text-faint); font-size: 0.8125rem; font-weight: 600; padding-top: 1px; white-space: nowrap; }
 .ev-card__meta dd { margin: 0; min-width: 0; }
 .ev-card__status { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
 

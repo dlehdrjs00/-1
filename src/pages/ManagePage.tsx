@@ -1,11 +1,11 @@
 import { useId, useMemo, useState } from 'react'
 import type { EventItem } from '../types'
 import { EVENT_TYPE_MAP, WORK_MAP } from '../constants'
-import { formatDateRange } from '../lib/date'
 import { Link } from '../router'
 import { useStore } from '../store/AppStore'
 import { Button, EmptyState, PageHeader, SampleBadge, useConfirm, useToast } from '../components/ui'
 import { TypeLabel, WorkTags } from '../components/EventBits'
+import { PeriodText } from '../components/events/EventText'
 import { useDeleteEvent } from '../components/manage/useDeleteEvent'
 import { BackupSection } from '../components/manage/BackupSection'
 import { ResetSection } from '../components/manage/ResetSection'
@@ -33,29 +33,29 @@ function matchesQuery(e: EventItem, q: string): boolean {
 }
 
 function placeText(e: EventItem): string {
-  const place = [e.city, e.country].map((s) => s.trim()).filter(Boolean).join(', ')
-  return place || '장소 확인 필요'
+  return [e.city, e.country].map((s) => s.trim()).filter(Boolean).join(', ')
 }
 
 function ManageEventRow({ event, onDelete }: { event: EventItem; onDelete: (e: EventItem) => void }) {
+  const place = placeText(event)
   return (
     <li className="manage-event">
       <div className="manage-event__main">
         <div className="manage-event__title-row">
-          {event.isSample && <SampleBadge />}
           <Link to={`/events/${encodeURIComponent(event.id)}`} className="manage-event__title">
             {event.title}
           </Link>
+          {event.isSample && <SampleBadge />}
         </div>
         <div className="manage-event__meta">
           <WorkTags works={event.works} />
           <TypeLabel event={event} />
         </div>
         <p className="manage-event__sub">
-          <span>{placeText(event)}</span>
+          {place ? <span>{place}</span> : <span className="unknown">장소 확인 필요</span>}
           <span aria-hidden> · </span>
-          <span className={!event.startDate && !event.endDate ? 'unknown' : undefined}>
-            {formatDateRange(event.startDate, event.endDate)}
+          <span>
+            <PeriodText event={event} />
           </span>
         </p>
       </div>
@@ -76,7 +76,7 @@ function ManageEventRow({ event, onDelete }: { event: EventItem; onDelete: (e: E
 }
 
 const JUMPS = [
-  { key: 'events', label: '내 행사' },
+  { key: 'events', label: '전체 행사' },
   { key: 'samples', label: '샘플 데이터' },
   { key: 'backup', label: '백업 · 불러오기' },
   { key: 'storage', label: '저장 안내' },
@@ -155,11 +155,11 @@ export default function ManagePage() {
         ))}
       </nav>
 
-      {/* 내 행사 */}
+      {/* 전체 행사 (직접 등록 + 샘플) */}
       <section className="card manage-section" aria-labelledby={hid('events')}>
         <div className="manage-section__head manage-section__head--row">
           <h2 id={hid('events')} className="manage-section__title" tabIndex={-1}>
-            내 행사 <span className="manage-count">{events.length}</span>
+            전체 행사 <span className="manage-count">{events.length}</span>
           </h2>
           <Link to="/manage/new" className="btn btn--primary btn--md">
             + 행사 등록
@@ -181,7 +181,7 @@ export default function ManagePage() {
           <>
             <div className="manage-search">
               <label htmlFor={searchId} className="sr-only">
-                내 행사 검색
+                행사 검색
               </label>
               <input
                 id={searchId}

@@ -348,7 +348,7 @@ test.describe('뒤로 가기 · 이동 확인', () => {
     await expect(page).toHaveURL(/#\/events\/sample_001$/)
     await page.getByRole('button', { name: '수정' }).click()
     await expect(page).toHaveURL(/#\/manage\/edit\/sample_001$/)
-    await eventForm(page).getByRole('button', { name: '저장', exact: true }).click()
+    await eventForm(page).getByRole('button', { name: '변경 내용 저장' }).click()
     await expect(page).toHaveURL(/#\/events\/sample_001$/)
     await page.getByRole('button', { name: '뒤로' }).click()
     await expect(page).toHaveURL(/#\/events$/)

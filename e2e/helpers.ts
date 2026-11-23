@@ -98,7 +98,11 @@ export async function navTo(page: Page, label: '행사' | '관심' | '내 여행
 
 /** 토스트 알림 (문자열이면 앞의 아이콘을 뺀 전체 문구가 일치해야 함) */
 export function toast(page: Page, text: string | RegExp): Locator {
-  const re = typeof text === 'string' ? new RegExp(`^[✓!i]?\\s*${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`) : text
+  // 날짜 문구에는 줄바꿈 없는 공백(U+00A0)이 들어가므로 공백은 \s+ 로 비교
+  const re =
+    typeof text === 'string'
+      ? new RegExp(`^[✓!i]?\\s*${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')}\\s*$`)
+      : text
   return page.locator('.toasts .toast').filter({ hasText: re }).last()
 }
 
