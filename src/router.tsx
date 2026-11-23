@@ -29,8 +29,16 @@ export function navigate(path: string, opts: { replace?: boolean } = {}) {
   }
 }
 
+// 앱 안에서 이동한 횟수. 0이면 외부에서 바로 들어온 것이므로 history.back() 대신 fallback 으로 이동
+let inAppNavCount = 0
+if (typeof window !== 'undefined') {
+  window.addEventListener('hashchange', () => {
+    inAppNavCount++
+  })
+}
+
 export function goBack(fallback = '/events') {
-  if (window.history.length > 1) window.history.back()
+  if (inAppNavCount > 0) window.history.back()
   else navigate(fallback, { replace: true })
 }
 

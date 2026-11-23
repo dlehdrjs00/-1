@@ -26,10 +26,11 @@ export function getReservationStatus(
   if (e.reservationRequired === 'unknown') return 'unknown'
 
   const nowLocal = nowInTimezone(e.timezone, now)
-  if (e.reservationEnd && nowLocal >= e.reservationEnd) return 'closed'
+  // 종료 시각은 해당 분(分)까지 포함한다 (예: 23:59 마감 → 23:59 동안은 접수 중)
+  if (e.reservationEnd && nowLocal > e.reservationEnd) return 'closed'
   if (getEventStatus(e, now) === 'ended') return 'closed'
   if (e.reservationStart && nowLocal < e.reservationStart) return 'before_open'
-  if (e.reservationStart && e.reservationEnd && e.reservationStart <= nowLocal && nowLocal < e.reservationEnd) {
+  if (e.reservationStart && e.reservationEnd && e.reservationStart <= nowLocal && nowLocal <= e.reservationEnd) {
     return 'open'
   }
   return 'unknown'

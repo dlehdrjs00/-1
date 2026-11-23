@@ -67,6 +67,9 @@ function validateEvent(raw: unknown, idx: number, errors: string[]): EventItem |
   if (reservationStart === undefined || reservationEnd === undefined) {
     errors.push(`${where} (${title || id}): 예약 시각 형식(YYYY-MM-DDTHH:mm)이 올바르지 않습니다.`)
   }
+  if (reservationStart && reservationEnd && reservationStart >= reservationEnd) {
+    errors.push(`${where} (${title || id}): 예약 시작 시각이 예약 종료 시각보다 늦거나 같습니다.`)
+  }
   const rr = str(raw.reservationRequired)
   if (!RES_REQ.has(rr)) errors.push(`${where} (${title || id}): 예약 필요 여부 값이 올바르지 않습니다.`)
 
@@ -187,6 +190,11 @@ export function validateAppData(input: unknown): ValidationResult {
   for (const t of trips) {
     if (t.id && tripIds.has(t.id)) errors.push(`여행 id '${t.id}'가 중복됩니다.`)
     tripIds.add(t.id)
+    const itemIds = new Set<string>()
+    for (const i of t.items) {
+      if (i.id && itemIds.has(i.id)) errors.push(`여행 '${t.name || t.id}': 일정 id '${i.id}'가 중복됩니다.`)
+      itemIds.add(i.id)
+    }
   }
 
   if (errors.length) {
