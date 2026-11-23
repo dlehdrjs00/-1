@@ -129,6 +129,10 @@ export const ops = {
     const ev: EventItem = { ...input, id, createdAt: t, updatedAt: t }
     return { ...d, events: [ev, ...d.events] }
   },
+  /** 같은 id 가 있으면 갱신, 없으면 추가 (재시도해도 행사가 하나만 생기도록) */
+  upsertEvent(d: AppData, input: EventInput, id: string): AppData {
+    return d.events.some((e) => e.id === id) ? ops.updateEvent(d, id, input) : ops.addEvent(d, input, id)
+  },
   updateEvent(d: AppData, id: string, input: EventInput): AppData {
     return {
       ...d,
@@ -292,10 +296,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       activeTrip: d.trips.find((t) => t.id === d.activeTripId) ?? d.trips[0],
 
       addEvent(input, opts) {
-        const cur = engine.get()
         const id = opts?.id ?? newId('evt')
         // 같은 id 가 이미 있으면(이전 시도가 저장됨) 새로 만들지 않고 갱신 → 행사는 항상 하나
-        const next = cur.events.some((e) => e.id === id) ? ops.updateEvent(cur, id, input) : ops.addEvent(cur, input, id)
+        const next = ops.upsertEvent(engine.get(), input, id)
         if (!commit(next)) return null
         return next.events.find((e) => e.id === id) ?? null
       },
