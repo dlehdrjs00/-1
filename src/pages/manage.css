@@ -90,6 +90,15 @@
 }
 .ef-hint__req { color: var(--text-muted); white-space: nowrap; }
 
+/* 저장하지 않은 초안 알림 */
+.ef-draft { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+.ef-draft p { margin: 0; }
+.ef-draft__warn { font-weight: 600; }
+.ef-draft__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ef-draft__actions .btn { min-width: 96px; }
+/* 초안을 고르기 전에는 폼 입력을 막아 둔다 (inert) */
+.ef-form[inert] { opacity: 0.5; }
+
 .ef-summary { margin: 4px 0 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 8px; }
 /* 목록이라 위아래 항목의 누르는 영역이 겹치지 않게 알림 링크 버튼(40px)보다 조금 낮게 */
 .notice .ef-summary__link { color: inherit; font-weight: 700; padding-block: 4px; margin-block: -4px; }
@@ -127,10 +136,12 @@
 .ef-input-row > .icon-btn { flex: none; }
 
 .ef-form input[type='date']::-webkit-date-and-time-value,
+.ef-form input[type='time']::-webkit-date-and-time-value,
 .ef-form input[type='datetime-local']::-webkit-date-and-time-value { text-align: left; }
 /* iOS Safari: 날짜 입력의 고유 너비 때문에 좁은 화면에서 넘치지 않도록 */
 @supports (-webkit-touch-callout: none) {
   .ef-form input[type='date'],
+  .ef-form input[type='time'],
   .ef-form input[type='datetime-local'] { -webkit-appearance: none; appearance: none; display: block; }
 }
 

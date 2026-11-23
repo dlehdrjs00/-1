@@ -6,12 +6,20 @@ import {
   formatDateRange,
   formatDateShort,
   formatLocalDateTime,
+  formatReservationMoment,
+  hasTime,
+  isReservationRangeValid,
   isValidDate,
   isValidLocalDateTime,
+  isValidReservationMoment,
   isValidTime,
   isValidTimezone,
+  joinReservationMoment,
+  momentDate,
+  momentTime,
   nowInTimezone,
   rangesOverlap,
+  splitReservationMoment,
   todayInTimezone,
   weekday,
 } from '../lib/date'
@@ -170,6 +178,84 @@ describe('formatDate / formatDateShort / formatDateRange / formatLocalDateTime',
     expect(sp(formatLocalDateTime('2026-12-01T18:00', 'Etc/UTC'))).toBe('2026. 12. 1. (화) 18:00 (Etc/UTC)')
     expect(sp(formatLocalDateTime(null, 'Asia/Tokyo'))).toBe('확인 필요')
     expect(sp(formatLocalDateTime('2026-12-01', 'Asia/Tokyo'))).toBe('확인 필요')
+  })
+})
+
+describe('reservation moments (날짜만 또는 날짜+시각)', () => {
+  it('isValidReservationMoment accepts date-only and datetime, rejects the rest', () => {
+    for (const ok of ['2026-12-01', '2026-12-01T18:00', '2024-02-29', '2024-02-29T00:00', '2027-01-08T23:59']) {
+      expect(isValidReservationMoment(ok), ok).toBe(true)
+    }
+    for (const bad of [
+      '',
+      '2026-12-1',
+      '2026-02-30',
+      '2026-12-01T',
+      '2026-12-01T18',
+      '2026-12-01T24:00',
+      '2026-12-01T18:00:00',
+      '2026-12-01 18:00',
+      '18:00',
+      null,
+      undefined,
+      20261201,
+    ]) {
+      expect(isValidReservationMoment(bad), String(bad)).toBe(false)
+    }
+  })
+
+  it('hasTime / momentDate / momentTime', () => {
+    expect(hasTime('2026-12-01T18:00')).toBe(true)
+    expect(hasTime('2026-12-01')).toBe(false)
+    expect(momentDate('2026-12-01T18:00')).toBe('2026-12-01')
+    expect(momentDate('2026-12-01')).toBe('2026-12-01')
+    expect(momentTime('2026-12-01T18:00')).toBe('18:00')
+    expect(momentTime('2026-12-01')).toBeNull()
+  })
+
+  it('split / join round-trip without inventing a time', () => {
+    expect(splitReservationMoment('2026-12-01T18:00')).toEqual({ date: '2026-12-01', time: '18:00' })
+    expect(splitReservationMoment('2026-12-01')).toEqual({ date: '2026-12-01', time: '' })
+    expect(splitReservationMoment(null)).toEqual({ date: '', time: '' })
+    expect(splitReservationMoment('garbage')).toEqual({ date: '', time: '' })
+
+    expect(joinReservationMoment('2026-12-01', '18:00')).toBe('2026-12-01T18:00')
+    // 시각이 비면 날짜만 — 00:00 / 23:59 로 채우지 않는다
+    expect(joinReservationMoment('2026-12-01', '')).toBe('2026-12-01')
+    expect(joinReservationMoment(' 2026-12-01 ', '  ')).toBe('2026-12-01')
+    expect(joinReservationMoment('', '')).toBeNull()
+    expect(joinReservationMoment('', '18:00')).toBeNull()
+
+    for (const v of ['2026-12-01T18:00', '2026-12-01', '2027-01-08T23:59', '2027-01-08T00:00']) {
+      const { date, time } = splitReservationMoment(v)
+      expect(joinReservationMoment(date, time)).toBe(v)
+    }
+  })
+
+  it('isReservationRangeValid: both timed → start < end, otherwise compare dates (same day ok)', () => {
+    expect(isReservationRangeValid('2026-12-01T10:00', '2026-12-01T10:01')).toBe(true)
+    expect(isReservationRangeValid('2026-12-01T10:00', '2026-12-01T10:00')).toBe(false)
+    expect(isReservationRangeValid('2026-12-01T10:00', '2026-11-30T23:59')).toBe(false)
+
+    expect(isReservationRangeValid('2026-12-01', '2026-12-01')).toBe(true)
+    expect(isReservationRangeValid('2026-12-01', '2026-12-01T00:00')).toBe(true)
+    expect(isReservationRangeValid('2026-12-01T23:59', '2026-12-01')).toBe(true)
+    expect(isReservationRangeValid('2026-12-01', '2026-12-20')).toBe(true)
+
+    expect(isReservationRangeValid('2026-12-02', '2026-12-01')).toBe(false)
+    expect(isReservationRangeValid('2026-12-02', '2026-12-01T23:59')).toBe(false)
+    expect(isReservationRangeValid('2026-12-02T00:00', '2026-12-01')).toBe(false)
+  })
+
+  it("formatReservationMoment: datetime unchanged, date-only → '· 시각 미정', missing → '확인 필요'", () => {
+    expect(sp(formatReservationMoment('2026-12-01T18:00', 'Asia/Tokyo'))).toBe('2026. 12. 1. (화) 18:00 (일본 시간)')
+    expect(formatReservationMoment('2026-12-01T18:00', 'Asia/Tokyo')).toBe(formatLocalDateTime('2026-12-01T18:00', 'Asia/Tokyo'))
+    expect(sp(formatReservationMoment('2026-12-01', 'Asia/Tokyo'))).toBe('2026. 12. 1. (화) · 시각 미정')
+    expect(sp(formatReservationMoment('2026-12-10', 'Asia/Seoul'))).toBe('2026. 12. 10. (목) · 시각 미정')
+    expect(formatReservationMoment('2026-12-01', 'Asia/Tokyo')).not.toMatch(/00:00|23:59/)
+    expect(formatReservationMoment(null, 'Asia/Tokyo')).toBe('확인 필요')
+    expect(formatReservationMoment(undefined, 'Asia/Tokyo')).toBe('확인 필요')
+    expect(formatReservationMoment('2026-02-30', 'Asia/Tokyo')).toBe('확인 필요')
   })
 })
 

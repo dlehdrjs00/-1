@@ -5,7 +5,7 @@ import { createDefaultTrip } from '../data/initial'
 import { createSampleEvents } from '../data/samples'
 import { getEventStatus, getReservationStatus } from '../lib/status'
 import { getAddWarnings, isDateInEventPeriod } from '../lib/trip'
-import { rangesOverlap } from '../lib/date'
+import { formatReservationMoment, hasTime, rangesOverlap } from '../lib/date'
 import { validateAppData } from '../lib/validate'
 
 const samples = createSampleEvents()
@@ -106,6 +106,13 @@ describe('sample events — coverage', () => {
     expect([...rs].sort()).toEqual(['before_open', 'closed', 'not_required', 'open', 'unknown'])
   })
 
+  it('includes a date-only reservation moment (시각 미정) and keeps the others timed or null', () => {
+    const moments = samples.flatMap((e) => [e.reservationStart, e.reservationEnd]).filter((m): m is string => m !== null)
+    expect(moments.filter((m) => !hasTime(m))).toEqual(['2026-12-10'])
+    // 시각을 모른다고 00:00 / 23:59 를 지어낸 날짜만 값이 아님을 확인 (날짜만 값은 그대로 'YYYY-MM-DD')
+    expect(moments.every((m) => /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/.test(m))).toBe(true)
+  })
+
   it('several samples overlap the default trip 2027-01-09 ~ 01-13', () => {
     const overlapping = samples.filter((e) => rangesOverlap(e.startDate, e.endDate, TRIP.startDate, TRIP.endDate))
     expect(overlapping.length).toBeGreaterThanOrEqual(5)
@@ -155,6 +162,18 @@ describe('sample events — specific scenarios', () => {
     const tripDay = new Date('2027-01-09T03:00:00Z')
     expect(getReservationStatus(e, tripDay)).toBe('closed')
     expect(getEventStatus(e, tripDay)).toBe('ongoing')
+  })
+
+  it("sample_005 reservation start is date-only (시각 미정) → before_open now, unknown on that day, open the day after", () => {
+    const e = byId('sample_005')
+    expect([e.reservationStart, e.reservationEnd]).toEqual(['2026-12-10', '2026-12-20T23:59'])
+    expect(formatReservationMoment(e.reservationStart, e.timezone).replace(/\u00A0/g, ' ')).toBe('2026. 12. 10. (목) · 시각 미정')
+    expect(getReservationStatus(e, NOW)).toBe('before_open')
+    // 12/10 (도쿄) 하루 동안은 몇 시에 열리는지 몰라 '확인 필요' — 접수 중으로 단정하지 않는다
+    expect(getReservationStatus(e, new Date('2026-12-09T15:00:00Z'))).toBe('unknown') // 12/10 00:00 Tokyo
+    expect(getReservationStatus(e, new Date('2026-12-10T14:59:00Z'))).toBe('unknown') // 12/10 23:59 Tokyo
+    expect(getReservationStatus(e, new Date('2026-12-10T15:00:00Z'))).toBe('open') // 12/11 00:00 Tokyo
+    expect(getReservationStatus(e, new Date('2026-12-20T15:00:00Z'))).toBe('closed') // 12/21 00:00 Tokyo
   })
 
   it('sample_008 is required with null times → unknown, never open', () => {

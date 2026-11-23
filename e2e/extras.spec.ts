@@ -15,6 +15,7 @@ import {
   addCurrentEventToTrip,
   STORAGE_KEY,
   SAMPLE_COUNT,
+  eventFormActions,
 } from './helpers'
 
 test.describe('행사 수정', () => {
@@ -43,7 +44,7 @@ test.describe('행사 수정', () => {
     await form.getByRole('textbox', { name: '행사명' }).fill('E2E 수정 후 제목')
     // 기간을 줄여 기존 일정(1/11)이 행사 기간 밖이 되게 한다
     await form.getByLabel('종료일', { exact: true }).fill('2027-01-10')
-    await form.getByRole('button', { name: '변경 내용 저장' }).click()
+    await eventFormActions(page).getByRole('button', { name: '변경 내용 저장' }).click()
     await expect(toast(page, '저장했어요')).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`#/events/${id}$`))
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('E2E 수정 후 제목')
@@ -65,7 +66,7 @@ test.describe('행사 수정', () => {
     await expect(page.getByText('샘플 행사를 수정하고 있어요')).toBeVisible()
     const form = eventForm(page)
     await form.getByRole('textbox', { name: '행사명' }).fill('바꾸다 만 제목')
-    await form.getByRole('button', { name: '취소' }).click()
+    await eventFormActions(page).getByRole('button', { name: '취소' }).click()
     await answerConfirm(page, '저장하지 않고 나갈까요?', '나가기')
     const ev = (await readStored(page)).events.find((e) => e.id === 'sample_001')!
     expect(ev.title).toBe('[샘플] 가상 콜라보 카페 A')
@@ -74,7 +75,7 @@ test.describe('행사 수정', () => {
   test('샘플 행사를 수정해도 샘플 표시는 유지된다', async ({ page }) => {
     await openRoute(page, '/manage/edit/sample_002')
     await eventForm(page).getByLabel('메모', { exact: true }).fill('E2E 메모 수정')
-    await eventForm(page).getByRole('button', { name: '변경 내용 저장' }).click()
+    await eventFormActions(page).getByRole('button', { name: '변경 내용 저장' }).click()
     await expect(page).toHaveURL(/#\/events\/sample_002$/)
     await expect(page.locator('h1 .badge--sample')).toHaveText('샘플')
     await expect(infoValue(page, '메모')).toHaveText('E2E 메모 수정')
@@ -330,7 +331,7 @@ test.describe('뒤로 가기 · 이동 확인', () => {
     const form = eventForm(page)
     await form.getByRole('textbox', { name: '행사명' }).fill('E2E 뒤로 가기 확인')
     await form.getByRole('group', { name: '관련 작품' }).getByRole('button', { name: '원신' }).click()
-    await form.getByRole('button', { name: '저장', exact: true }).click()
+    await eventFormActions(page).getByRole('button', { name: '저장', exact: true }).click()
     await expect(page).toHaveURL(/#\/events\/evt/)
     await page.getByRole('button', { name: '뒤로' }).click()
     await expect(page).toHaveURL(/#\/manage$/, { timeout: 2000 })
@@ -348,14 +349,13 @@ test.describe('뒤로 가기 · 이동 확인', () => {
     await expect(page).toHaveURL(/#\/events\/sample_001$/)
     await page.getByRole('button', { name: '수정' }).click()
     await expect(page).toHaveURL(/#\/manage\/edit\/sample_001$/)
-    await eventForm(page).getByRole('button', { name: '변경 내용 저장' }).click()
+    await eventFormActions(page).getByRole('button', { name: '변경 내용 저장' }).click()
     await expect(page).toHaveURL(/#\/events\/sample_001$/)
     await page.getByRole('button', { name: '뒤로' }).click()
     await expect(page).toHaveURL(/#\/events$/)
   })
 
-  // APP BUG(낮음): 행사 등록/수정 폼은 '취소'와 새로고침(beforeunload)에는 저장 안 한 변경을 경고하지만,
-  // 하단/상단 메뉴로 다른 탭에 가면 경고 없이 입력 내용이 사라진다.
+  // 메뉴 링크 이동은 확인 대화상자로 막고, 브라우저 뒤로 가기·새로고침은 초안 저장·복구로 보호한다 (draft.spec.ts).
   test('작성 중인 행사 폼에서 메뉴로 이동하면 저장하지 않고 나갈지 묻는다', async ({ page }) => {
     await openRoute(page, '/manage/new')
     await eventForm(page).getByRole('textbox', { name: '행사명' }).fill('작성 중인 제목')

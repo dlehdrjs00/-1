@@ -1,5 +1,13 @@
-import type { EventItem } from '../../types'
-import { formatDateRange } from '../../lib/date'
+import type { EventItem, ReservationMoment } from '../../types'
+import {
+  TIME_UNKNOWN_LABEL,
+  formatDate,
+  formatDateRange,
+  formatLocalDateTime,
+  hasTime,
+  isValidReservationMoment,
+  momentDate,
+} from '../../lib/date'
 import { isPermanentShop } from '../../lib/status'
 
 /** 비어 있는 값 표시. 값을 지어내지 않고 '확인 필요'로 보여 준다. */
@@ -18,6 +26,24 @@ export function PeriodText({ event }: { event: Pick<EventItem, 'startDate' | 'en
   const text = formatDateRange(event.startDate, event.endDate)
   if (event.startDate && event.endDate) return <>{text}</>
   return <span className="unknown">{text}</span>
+}
+
+/**
+ * 예약 시작·종료 시점 (행사 현지 시간대 기준).
+ * - 날짜+시각: '2026. 12. 1. (화) 18:00 (일본 시간)'
+ * - 날짜만:   '2026. 12. 1. (화) · 시각 미정' — '시각 미정'은 경고색으로 (시각을 지어내지 않는다)
+ * - 없음:     '확인 필요'
+ */
+export function ReservationMomentText({ value, tz }: { value: ReservationMoment | null | undefined; tz: string }) {
+  if (!value || !isValidReservationMoment(value)) return <Unknown />
+  if (hasTime(value)) return <>{formatLocalDateTime(value, tz)}</>
+  return (
+    <>
+      {formatDate(momentDate(value))}
+      {' · '}
+      <Unknown label={TIME_UNKNOWN_LABEL} />
+    </>
+  )
 }
 
 /** '도시 · 장소'. 둘 다 없으면 '확인 필요' */

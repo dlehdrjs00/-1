@@ -179,7 +179,19 @@ describe('validateAppData — rejects', () => {
   })
 
   it('event with a bad reservation time format', () => {
-    for (const bad of ['2026-12-01 18:00', '2026-12-01T18:00:00', '2026-12-01T25:00', '2026-12-01']) {
+    // 날짜만('2026-12-01')은 이제 유효 (시각 미정). 그 밖의 형식은 거부
+    for (const bad of [
+      '2026-12-01 18:00',
+      '2026-12-01T18:00:00',
+      '2026-12-01T25:00',
+      '2026-12-01T',
+      '2026-12-01T18',
+      '2026-12-1',
+      '2026/12/01',
+      '2026-02-30',
+      '18:00',
+      ' 2026-12-01',
+    ]) {
       const errs = expectErrors(makeData({ events: [makeEvent({ reservationStart: bad })] }))
       expect(errs.some((e) => e.includes('예약 시각 형식'))).toBe(true)
     }
@@ -334,5 +346,78 @@ describe('validateAppData — trip length limit', () => {
   it('rejects trips longer than 366 days', () => {
     const res = validateAppData(JSON.parse(JSON.stringify(makeData({ trips: [makeTrip({ startDate: '2027-01-01', endDate: '2028-06-30' })] }))))
     expect(res.ok).toBe(false)
+  })
+})
+
+describe('validateAppData — reservation start/end with date only (시각 미정)', () => {
+  /** 이 기능 이전에 내보낸 백업 파일 그대로 (예약 시각은 'YYYY-MM-DDTHH:mm' 또는 null 만 있음) */
+  const LEGACY_BACKUP_JSON = JSON.stringify({
+    app: 'subcul-trip-planner',
+    exportedAt: '2026-11-20T09:00:00.000Z',
+    schemaVersion: 1,
+    events: [
+      makeEvent({ id: 'evt_a', reservationStart: '2026-12-01T18:00', reservationEnd: '2027-01-30T23:59' }),
+      makeEvent({ id: 'evt_b', reservationStart: '2026-11-01T12:00', reservationEnd: null }),
+      makeEvent({ id: 'evt_c', reservationRequired: 'unknown', reservationStart: null, reservationEnd: null }),
+    ],
+    favorites: ['evt_a'],
+    trips: [makeTrip({ items: [makeItem({ eventId: 'evt_a' })] })],
+    activeTripId: 'trip_1',
+  })
+
+  it('legacy backup (datetime form / null only) still loads unchanged', () => {
+    const res = validateAppData(JSON.parse(LEGACY_BACKUP_JSON))
+    if (!res.ok) throw new Error(res.errors.join('\n'))
+    expect(res.data.schemaVersion).toBe(1)
+    expect(res.data.events.map((e) => [e.id, e.reservationStart, e.reservationEnd])).toEqual([
+      ['evt_a', '2026-12-01T18:00', '2027-01-30T23:59'],
+      ['evt_b', '2026-11-01T12:00', null],
+      ['evt_c', null, null],
+    ])
+    // 다시 내보내고 불러와도 같은 값 (왕복)
+    const again = roundTrip(toExportPayload(res.data))
+    expect(again).toEqual({ ok: true, data: res.data })
+  })
+
+  it('accepts date-only start/end and keeps them as date-only (no 00:00 / 23:59 filled in)', () => {
+    const cases: [string | null, string | null][] = [
+      ['2026-12-01', '2026-12-20'],
+      ['2026-12-01', '2026-12-20T23:59'],
+      ['2026-12-01T18:00', '2026-12-20'],
+      ['2026-12-01', null],
+      [null, '2026-12-20'],
+    ]
+    for (const [reservationStart, reservationEnd] of cases) {
+      const data = makeData({ events: [makeEvent({ reservationStart, reservationEnd })] })
+      const res = roundTrip(toExportPayload(data))
+      expect(res, `${reservationStart} ~ ${reservationEnd}`).toEqual({ ok: true, data })
+    }
+  })
+
+  it('start must not be after end: both with time → start < end', () => {
+    expect(roundTrip(makeData({ events: [makeEvent({ reservationStart: '2026-12-01T10:00', reservationEnd: '2026-12-01T10:01' })] })).ok).toBe(true)
+    const errs = expectErrors(makeData({ events: [makeEvent({ reservationStart: '2026-12-01T10:00', reservationEnd: '2026-12-01T10:00' })] }))
+    expect(errs.some((e) => e.includes('예약 시작 시각이 예약 종료 시각보다 늦거나 같습니다'))).toBe(true)
+  })
+
+  it('start must not be after end: date-only on either side → compare dates (same day allowed)', () => {
+    const ok: [string, string][] = [
+      ['2026-12-01', '2026-12-01'], // 같은 날, 둘 다 시각 미정
+      ['2026-12-01', '2026-12-01T10:00'], // 같은 날, 시작 시각 미정
+      ['2026-12-01T23:00', '2026-12-01'], // 같은 날, 종료 시각 미정
+      ['2026-12-01', '2026-12-02T00:00'],
+    ]
+    for (const [s, e] of ok) {
+      expect(roundTrip(makeData({ events: [makeEvent({ reservationStart: s, reservationEnd: e })] })).ok, `${s} ~ ${e}`).toBe(true)
+    }
+    const bad: [string, string][] = [
+      ['2026-12-02', '2026-12-01'],
+      ['2026-12-02', '2026-12-01T23:59'],
+      ['2026-12-02T00:00', '2026-12-01'],
+    ]
+    for (const [s, e] of bad) {
+      const errs = expectErrors(makeData({ events: [makeEvent({ reservationStart: s, reservationEnd: e })] }))
+      expect(errs.some((x) => x.includes('예약 시작일이 예약 종료일보다 늦습니다')), `${s} ~ ${e}`).toBe(true)
+    }
   })
 })

@@ -44,7 +44,9 @@ test('행사 등록 → 관심 저장 → 여행에 추가 → 새로고침 후�
   })
   // 국가를 '일본'으로 고르면 시간대가 일본 시간으로 맞춰진다
   await expect(page.getByLabel('시간대')).toHaveValue('Asia/Tokyo')
-  await expect(page.getByLabel(/^예약 시작 \(행사 현지 시간: 일본 시간\)/)).toHaveValue('2026-11-20T10:00')
+  await expect(page.getByRole('group', { name: '예약 시작 (행사 현지 시간: 일본 시간)' })).toBeVisible()
+  await expect(page.getByLabel('예약 시작 날짜', { exact: true })).toHaveValue('2026-11-20')
+  await expect(page.getByLabel('예약 시작 시각', { exact: true })).toHaveValue('10:00')
 
   await submitEventForm(page)
 

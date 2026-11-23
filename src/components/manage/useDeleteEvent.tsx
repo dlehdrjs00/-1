@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import type { EventItem } from '../../types'
 import { useStore } from '../../store/AppStore'
+import { clearEventDraftsFor } from '../../lib/eventDraft'
 import { useConfirm, useToast } from '../ui'
 
 /**
@@ -42,6 +43,8 @@ export function useDeleteEvent() {
       })
       if (!ok) return false
       const removed = store.deleteEvent(event.id)
+      // 이 행사의 저장하지 않은 수정 초안도 지운다
+      clearEventDraftsFor([event.id])
       toast(removed > 0 ? `행사를 삭제했어요. 여행 일정 ${removed}개도 함께 삭제했어요.` : '행사를 삭제했어요.')
       return true
     },

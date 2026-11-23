@@ -398,8 +398,10 @@ input[type='datetime-local']::-webkit-calendar-picker-indicator { filter: invert
 @media (min-width: 768px) { .toasts { bottom: 24px; } }
 /* 모달이 열려 있으면 하단 버튼을 가리지 않도록 화면 위쪽에 표시 */
 body:has(.modal-backdrop) .toasts { top: calc(12px + env(safe-area-inset-top)); bottom: auto; }
-/* 모달 위에는 가장 최근 알림 하나만 (여러 개가 쌓여 모달 제목·닫기 버튼을 가리지 않게) */
+/* 알림은 자리 두 개(성공·안내 1, 오류 1)뿐이고 같은 자리의 새 알림은 이전 것을 바꾼다 (ui.tsx ToastProvider).
+   모달 위에는 하나만: 마지막에 그려지는 오류가 있으면 오류를, 없으면 성공·안내를 보여 준다 (모달 제목·닫기 버튼을 가리지 않게) */
 body:has(.modal-backdrop) .toast:not(:last-child) { display: none; }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 
 /* ---------------- Definition list (상세 정보) ---------------- */
 .info-list { display: grid; grid-template-columns: 1fr; gap: 0; margin: 0; }

@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -182,9 +183,12 @@ export function Modal({
   footer?: ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  // onClose 가 매 렌더마다 새 함수여도 포커스를 다시 뺏지 않도록 ref 로 보관
+  // onClose 가 매 렌더마다 새 함수여도 포커스를 다시 뺏지 않도록 ref 로 보관.
+  // 렌더 중에 ref 를 쓰지 않도록 화면 반영 직후(키 입력 처리 전)에 최신 함수로 바꾼다.
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose
+  })
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCloseRef.current()
@@ -218,28 +222,72 @@ export function Modal({
 
 /* ---------------- Toast ---------------- */
 
-type ToastKind = 'success' | 'error' | 'info'
-interface ToastItem {
+export type ToastKind = 'success' | 'error' | 'info'
+export interface ToastItem {
   id: number
   kind: ToastKind
   message: string
 }
 
+/**
+ * 알림 자리는 두 개뿐이다: 오류 하나(error), 성공·안내 하나(note).
+ * - 같은 자리에 새 알림이 오면 이전 알림을 바로 바꾼다 (쌓이지 않음, 가장 최근 것만).
+ * - 성공·안내 알림은 오류 알림 자리를 건드리지 않으므로, 방금 뜬 오류를 성공 알림이 덮어 가리지 않는다.
+ */
+export type ToastSlot = 'note' | 'error'
+export interface ToastSlots {
+  note: ToastItem | null
+  error: ToastItem | null
+}
+export const EMPTY_TOASTS: ToastSlots = { note: null, error: null }
+export const TOAST_DURATION_MS: Record<ToastKind, number> = { success: 3000, info: 3000, error: 6000 }
+
+export const toastSlotOf = (kind: ToastKind): ToastSlot => (kind === 'error' ? 'error' : 'note')
+
+/** 새 알림을 제 자리에 넣는다 (같은 자리의 이전 알림은 사라진다) */
+export function placeToast(slots: ToastSlots, item: ToastItem): ToastSlots {
+  return { ...slots, [toastSlotOf(item.kind)]: item }
+}
+
+/** 시간이 다 된 알림을 뺀다. 그 사이 같은 자리에 더 새 알림이 들어왔으면 그대로 둔다. */
+export function expireToast(slots: ToastSlots, id: number): ToastSlots {
+  if (slots.note?.id === id) return { ...slots, note: null }
+  if (slots.error?.id === id) return { ...slots, error: null }
+  return slots
+}
+
+/** 화면에 그릴 순서. 오류를 마지막에 둔다 (모달이 열려 하나만 보일 때 오류가 남도록, index.css 참고) */
+export function visibleToasts(slots: ToastSlots): ToastItem[] {
+  return [slots.note, slots.error].filter((t): t is ToastItem => t !== null)
+}
+
 const ToastCtx = createContext<((message: string, kind?: ToastKind) => void) | null>(null)
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<ToastItem[]>([])
+  const [slots, setSlots] = useState<ToastSlots>(EMPTY_TOASTS)
   const seq = useRef(0)
+  const timers = useRef<Record<ToastSlot, number | undefined>>({ note: undefined, error: undefined })
   const push = useCallback((message: string, kind: ToastKind = 'success') => {
+    // id 가 바뀌면 key 가 바뀌어 새 요소로 그려진다 → 같은 문구가 다시 와도 화면 읽기 프로그램이 다시 읽고,
+    // 나타나는 애니메이션도 다시 재생된다.
     const id = ++seq.current
-    setItems((xs) => [...xs.slice(-2), { id, kind, message }])
-    window.setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), kind === 'error' ? 6000 : 3000)
+    const slot = toastSlotOf(kind)
+    window.clearTimeout(timers.current[slot])
+    setSlots((s) => placeToast(s, { id, kind, message }))
+    timers.current[slot] = window.setTimeout(() => setSlots((s) => expireToast(s, id)), TOAST_DURATION_MS[kind])
+  }, [])
+  useEffect(() => {
+    const t = timers.current
+    return () => {
+      window.clearTimeout(t.note)
+      window.clearTimeout(t.error)
+    }
   }, [])
   return (
     <ToastCtx.Provider value={push}>
       {children}
       <div className="toasts" aria-live="polite">
-        {items.map((t) => (
+        {visibleToasts(slots).map((t) => (
           <div key={t.id} className={`toast toast--${t.kind}`} role={t.kind === 'error' ? 'alert' : 'status'}>
             <span aria-hidden>{t.kind === 'success' ? '✓' : t.kind === 'error' ? '!' : 'i'}</span>
             {t.message}

@@ -1,9 +1,10 @@
 import type { ItineraryItem, Trip } from '../../types'
-import { formatDate, formatLocalDateTime } from '../../lib/date'
+import { formatDate } from '../../lib/date'
 import { getReservationStatus } from '../../lib/status'
 import { Link } from '../../router'
 import { useStore } from '../../store/AppStore'
 import { StatusBadges, TypeLabel } from '../EventBits'
+import { ReservationMomentText } from '../events/EventText'
 import { Badge, Button, SampleBadge } from '../ui'
 import { itemWarnings } from './tripFormat'
 
@@ -75,7 +76,9 @@ export function ItineraryItemCard({ trip, item, position, showDate, onMove, onEd
           <div className="tp-item__status">
             <StatusBadges event={event} />
             {reservation === 'before_open' && event.reservationStart && (
-              <p className="tp-item__hint">예약 오픈 {formatLocalDateTime(event.reservationStart, event.timezone)}</p>
+              <p className="tp-item__hint">
+                예약 오픈 <ReservationMomentText value={event.reservationStart} tz={event.timezone} />
+              </p>
             )}
           </div>
         )}

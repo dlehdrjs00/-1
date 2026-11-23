@@ -1,5 +1,6 @@
 import { useCallback, useId, useState } from 'react'
 import { useStore } from '../../store/AppStore'
+import { clearAllEventDrafts } from '../../lib/eventDraft'
 import { Button, Field, Modal, useToast } from '../ui'
 import { dataCounts, downloadBackup } from './backup'
 
@@ -26,6 +27,8 @@ export function ResetSection({ headingId }: { headingId: string }) {
   const doReset = () => {
     if (!canReset) return
     store.resetAll()
+    // 저장하지 않은 행사 등록·수정 초안도 모두 지운다
+    clearAllEventDrafts()
     close()
     toast('모든 데이터를 초기화했어요.')
   }

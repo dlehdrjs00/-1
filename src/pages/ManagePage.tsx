@@ -3,6 +3,7 @@ import type { EventItem } from '../types'
 import { EVENT_TYPE_MAP, WORK_MAP } from '../constants'
 import { Link } from '../router'
 import { useStore } from '../store/AppStore'
+import { clearEventDraftsFor } from '../lib/eventDraft'
 import { Button, EmptyState, PageHeader, SampleBadge, useConfirm, useToast } from '../components/ui'
 import { TypeLabel, WorkTags } from '../components/EventBits'
 import { PeriodText } from '../components/events/EventText'
@@ -132,7 +133,10 @@ export default function ManagePage() {
       ),
     })
     if (!ok) return
+    const sampleIds = samples.map((e) => e.id)
     const n = store.deleteSamples()
+    // 삭제한 샘플의 저장하지 않은 수정 초안도 지운다
+    clearEventDraftsFor(sampleIds)
     toast(`샘플 행사 ${n}개를 삭제했어요.`)
   }
 

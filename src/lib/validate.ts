@@ -8,7 +8,15 @@ import type {
   WorkId,
 } from '../types'
 import { EVENT_TYPES, WORKS } from '../constants'
-import { daysBetween, isValidDate, isValidLocalDateTime, isValidTime, isValidTimezone } from './date'
+import {
+  daysBetween,
+  hasTime,
+  isReservationRangeValid,
+  isValidDate,
+  isValidReservationMoment,
+  isValidTime,
+  isValidTimezone,
+} from './date'
 
 export type ValidationResult = { ok: true; data: AppData } | { ok: false; errors: string[] }
 
@@ -33,9 +41,10 @@ function nullableDate(v: unknown): string | null | undefined {
   return isValidDate(v) ? v : undefined
 }
 
-function nullableLocalDT(v: unknown): string | null | undefined {
+/** 예약 시작·종료: 'YYYY-MM-DD'(시각 미정) 또는 'YYYY-MM-DDTHH:mm'. 예전 백업(시각 있는 형식)도 그대로 통과 */
+function nullableReservationMoment(v: unknown): string | null | undefined {
   if (v === null || v === undefined || v === '') return null
-  return isValidLocalDateTime(v) ? v : undefined
+  return isValidReservationMoment(v) ? v : undefined
 }
 
 function validateEvent(raw: unknown, idx: number, errors: string[]): EventItem | null {
@@ -64,13 +73,17 @@ function validateEvent(raw: unknown, idx: number, errors: string[]): EventItem |
   if (startDate === undefined || endDate === undefined) errors.push(`${where} (${title || id}): 날짜 형식(YYYY-MM-DD)이 올바르지 않습니다.`)
   if (startDate && endDate && startDate > endDate) errors.push(`${where} (${title || id}): 시작일이 종료일보다 늦습니다.`)
 
-  const reservationStart = nullableLocalDT(raw.reservationStart)
-  const reservationEnd = nullableLocalDT(raw.reservationEnd)
+  const reservationStart = nullableReservationMoment(raw.reservationStart)
+  const reservationEnd = nullableReservationMoment(raw.reservationEnd)
   if (reservationStart === undefined || reservationEnd === undefined) {
-    errors.push(`${where} (${title || id}): 예약 시각 형식(YYYY-MM-DDTHH:mm)이 올바르지 않습니다.`)
+    errors.push(`${where} (${title || id}): 예약 시각 형식(YYYY-MM-DD 또는 YYYY-MM-DDTHH:mm)이 올바르지 않습니다.`)
   }
-  if (reservationStart && reservationEnd && reservationStart >= reservationEnd) {
-    errors.push(`${where} (${title || id}): 예약 시작 시각이 예약 종료 시각보다 늦거나 같습니다.`)
+  if (reservationStart && reservationEnd && !isReservationRangeValid(reservationStart, reservationEnd)) {
+    errors.push(
+      hasTime(reservationStart) && hasTime(reservationEnd)
+        ? `${where} (${title || id}): 예약 시작 시각이 예약 종료 시각보다 늦거나 같습니다.`
+        : `${where} (${title || id}): 예약 시작일이 예약 종료일보다 늦습니다.`,
+    )
   }
   const rr = str(raw.reservationRequired)
   if (!RES_REQ.has(rr)) errors.push(`${where} (${title || id}): 예약 필요 여부 값이 올바르지 않습니다.`)

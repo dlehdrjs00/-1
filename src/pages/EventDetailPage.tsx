@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { EventItem, ItineraryItem, Trip } from '../types'
 import { RESERVATION_REQUIREMENT_LABEL, TIMEZONE_SHORT } from '../constants'
-import { daysBetween, formatDate, formatDateShort, formatLocalDateTime, isValidTimezone, todayLocal } from '../lib/date'
+import { daysBetween, formatDate, formatDateShort, isValidTimezone, todayLocal } from '../lib/date'
 import { getEventStatus, getReservationStatus } from '../lib/status'
 import { tripDatesWithinEvent } from '../lib/trip'
 import { useStore } from '../store/AppStore'
@@ -9,7 +9,7 @@ import { Link, goBack, navigate } from '../router'
 import { Button, EmptyState, Notice, SampleBadge } from '../components/ui'
 import { FavoriteButton, StatusBadges, TypeLabel, WorkTags } from '../components/EventBits'
 import { AddToTripDialog } from '../components/AddToTripDialog'
-import { ExternalUrl, PeriodText, PlaceText, TextOrUnknown, Unknown } from '../components/events/EventText'
+import { ExternalUrl, PeriodText, PlaceText, ReservationMomentText, TextOrUnknown, Unknown } from '../components/events/EventText'
 import './events.css'
 
 /** 마지막 확인일이 이보다 오래되면 다시 확인하라고 안내 */
@@ -43,11 +43,6 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
 
 function DateValue({ value }: { value: string | null }) {
   return value ? <>{formatDate(value)}</> : <Unknown />
-}
-
-function DateTimeValue({ value, tz }: { value: string | null; tz: string }) {
-  const text = formatLocalDateTime(value, tz)
-  return value && text !== '확인 필요' ? <>{text}</> : <Unknown />
 }
 
 interface Scheduled {
@@ -279,10 +274,10 @@ export default function EventDetailPage({ id }: { id: string }) {
           {!hideResTimes && (
             <>
               <InfoRow label="예약 시작">
-                <DateTimeValue value={event.reservationStart} tz={event.timezone} />
+                <ReservationMomentText value={event.reservationStart} tz={event.timezone} />
               </InfoRow>
               <InfoRow label="예약 종료">
-                <DateTimeValue value={event.reservationEnd} tz={event.timezone} />
+                <ReservationMomentText value={event.reservationEnd} tz={event.timezone} />
               </InfoRow>
             </>
           )}

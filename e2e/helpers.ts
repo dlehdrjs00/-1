@@ -177,13 +177,26 @@ export async function fillEventForm(page: Page, v: EventFormInput) {
   if (v.startDate) await form.getByLabel('시작일', { exact: true }).fill(v.startDate)
   if (v.endDate) await form.getByLabel('종료일', { exact: true }).fill(v.endDate)
   if (v.reservation) await form.getByRole('radio', { name: v.reservation, exact: true }).check()
-  if (v.reservationStart) await form.getByLabel(/^예약 시작 \(행사 현지 시간/).fill(v.reservationStart)
-  if (v.reservationEnd) await form.getByLabel(/^예약 종료 \(행사 현지 시간/).fill(v.reservationEnd)
+  // 예약 시각: 'YYYY-MM-DD' (시각 미정) 또는 'YYYY-MM-DDTHH:mm' → 날짜 칸 + 시각 칸
+  for (const [label, val] of [
+    ['예약 시작', v.reservationStart],
+    ['예약 종료', v.reservationEnd],
+  ] as const) {
+    if (!val) continue
+    const [d, t] = val.split('T')
+    await form.getByLabel(`${label} 날짜`, { exact: true }).fill(d)
+    if (t) await form.getByLabel(`${label} 시각`, { exact: true }).fill(t)
+  }
   if (v.memo) await form.getByLabel('메모', { exact: true }).fill(v.memo)
 }
 
+/** 행사 폼의 저장·취소 버튼 영역 (짧은 화면에서도 하단 메뉴에 가리지 않도록 form 밖에 있음) */
+export function eventFormActions(page: Page): Locator {
+  return page.getByRole('group', { name: '저장·취소' })
+}
+
 export async function submitEventForm(page: Page) {
-  await eventForm(page).getByRole('button', { name: /^(저장|변경 내용 저장)$/ }).click()
+  await eventFormActions(page).getByRole('button', { name: /^(저장|변경 내용 저장)$/ }).click()
 }
 
 /** 정보 관리 → 행사 등록 → 입력 → 저장. 저장 후 상세 화면에 도착할 때까지 기다린다. */

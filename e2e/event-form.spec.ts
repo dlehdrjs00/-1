@@ -98,10 +98,10 @@ test.describe('행사 등록 폼 검증', () => {
       works: ['명조'],
       reservation: '필수',
       reservationStart: '2026-12-10T12:00',
-      reservationEnd: '2026-12-01T12:00',
+      reservationEnd: '2026-12-10T11:00',
     })
     await submitEventForm(page)
-    const resEnd = form.getByLabel(/^예약 종료 \(행사 현지 시간/)
+    const resEnd = form.getByLabel('예약 종료 시각', { exact: true })
     await expect(resEnd).toHaveAttribute('aria-invalid', 'true')
     await expect(resEnd).toHaveAccessibleDescription('예약 종료 시각은 예약 시작 시각보다 늦어야 해요.')
     await expect(page).toHaveURL(/#\/manage\/new$/)

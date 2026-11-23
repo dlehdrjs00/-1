@@ -1,7 +1,7 @@
 /**
  * 모바일 전용 레이아웃 검사. playwright.config.ts 에서 모바일 프로젝트에만 배정된다 (*.mobile.spec.ts).
  */
-import { test, expect, openRoute } from './helpers'
+import { test, expect, openRoute, eventFormActions } from './helpers'
 import { MAIN_ROUTES, expectBottomNav, expectNoHorizontalOverflow, seedContent } from './layout-helpers'
 
 test.describe('모바일 레이아웃', () => {
@@ -81,7 +81,7 @@ test.describe('모바일 레이아웃', () => {
 
     test('행사 등록 폼 오류 상태에서도 가로 넘침 없음', async ({ page }) => {
       await openRoute(page, '/manage/new')
-      await page.getByRole('form', { name: '행사 등록' }).getByRole('button', { name: '저장', exact: true }).click()
+      await eventFormActions(page).getByRole('button', { name: '저장', exact: true }).click()
       await expect(page.getByRole('alert').filter({ hasText: '입력 내용을 확인해 주세요' })).toBeVisible()
       await expectNoHorizontalOverflow(page, '/manage/new (오류) @360')
     })

@@ -1,4 +1,4 @@
-import type { DateOnly, LocalDateTime } from '../types'
+import type { DateOnly, LocalDateTime, ReservationMoment, TimeOnly } from '../types'
 import { TIMEZONE_SHORT } from '../constants'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -19,6 +19,55 @@ export function isValidLocalDateTime(v: unknown): v is LocalDateTime {
 
 export function isValidTime(v: unknown): v is string {
   return typeof v === 'string' && TIME_RE.test(v)
+}
+
+/* ---------------- 예약 시작·종료 시점 (날짜만 또는 날짜+시각) ---------------- */
+
+/** 'YYYY-MM-DD'(시각 미정) 또는 'YYYY-MM-DDTHH:mm' 인지 */
+export function isValidReservationMoment(v: unknown): v is ReservationMoment {
+  return isValidDate(v) || isValidLocalDateTime(v)
+}
+
+/** 시각까지 확인된 값인지 ('YYYY-MM-DDTHH:mm'). 날짜만 있으면 false */
+export function hasTime(m: ReservationMoment): m is LocalDateTime {
+  return isValidLocalDateTime(m)
+}
+
+/** 날짜 부분 'YYYY-MM-DD' */
+export function momentDate(m: ReservationMoment): DateOnly {
+  return m.slice(0, 10)
+}
+
+/** 시각 부분 'HH:mm'. 날짜만 있으면 null (시각 미정) */
+export function momentTime(m: ReservationMoment): TimeOnly | null {
+  return hasTime(m) ? m.slice(11, 16) : null
+}
+
+/** 폼 입력용으로 날짜·시각을 나눈다. 모르는 쪽은 '' */
+export function splitReservationMoment(m: ReservationMoment | null | undefined): { date: string; time: string } {
+  if (!m || !isValidReservationMoment(m)) return { date: '', time: '' }
+  return { date: momentDate(m), time: momentTime(m) ?? '' }
+}
+
+/**
+ * 날짜·시각 → 저장값. 시각이 비면 날짜만 저장한다 (00:00 / 23:59 로 채우지 않는다).
+ * 날짜가 비면 null. 형식 검증은 호출 측에서 한다.
+ */
+export function joinReservationMoment(date: string, time: string): ReservationMoment | null {
+  const d = date.trim()
+  const t = time.trim()
+  if (!d) return null
+  return t ? `${d}T${t}` : d
+}
+
+/**
+ * 예약 시작이 종료보다 늦지 않은지.
+ * - 둘 다 시각이 있으면 시작 < 종료 (같은 분은 허용하지 않음)
+ * - 한쪽이라도 날짜만 있으면 날짜끼리 비교: 시작일 <= 종료일 (같은 날은 허용)
+ */
+export function isReservationRangeValid(start: ReservationMoment, end: ReservationMoment): boolean {
+  if (hasTime(start) && hasTime(end)) return start < end
+  return momentDate(start) <= momentDate(end)
 }
 
 export function isValidTimezone(tz: unknown): tz is string {
@@ -103,6 +152,21 @@ export function timezoneLabel(tz: string): string {
 export function formatLocalDateTime(v: LocalDateTime | null | undefined, tz: string): string {
   if (!v || !isValidLocalDateTime(v)) return '확인 필요'
   return `${formatDate(v.slice(0, 10))}${NBSP}${v.slice(11)} (${timezoneLabel(tz)})`
+}
+
+/** 날짜만 있는 예약 시점에 붙이는 표시 */
+export const TIME_UNKNOWN_LABEL = '시각 미정'
+
+/**
+ * 예약 시작·종료 표시 (문자열).
+ * - 시각 있음: '2026. 12. 1. (화) 18:00 (일본 시간)' (formatLocalDateTime 과 같음)
+ * - 날짜만:   '2026. 12. 1. (화) · 시각 미정'
+ * - 없음/잘못된 값: '확인 필요'
+ */
+export function formatReservationMoment(v: ReservationMoment | null | undefined, tz: string): string {
+  if (!v || !isValidReservationMoment(v)) return '확인 필요'
+  if (hasTime(v)) return formatLocalDateTime(v, tz)
+  return `${formatDate(v)} · ${TIME_UNKNOWN_LABEL}`
 }
 
 /** start~end 사이의 모든 날짜 (양 끝 포함). 최대 366일 */
