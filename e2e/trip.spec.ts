@@ -233,14 +233,14 @@ test.describe('일정 추가 안내 (기간 밖 / 중복)', () => {
     expect(stored.items.filter((i) => i.eventId === 'sample_002' && i.date === '2027-01-09')).toHaveLength(2)
   })
 
-  test('내 여행 화면의 관심 행사 추가에서도 중복·기간 밖 안내', async ({ page }) => {
+  test('내 여행 화면의 행사·매장 추가에서도 중복·기간 밖 안내', async ({ page }) => {
     // sample_002 를 관심 저장
     await openRoute(page, '/events/sample_002')
     await page.getByRole('button', { name: '관심 저장', exact: true }).click()
 
     await openRoute(page, '/trips')
     const day4 = dayCard(page, '2027. 1. 12.')
-    await day4.getByRole('button', { name: '+ 관심 행사 추가' }).click()
+    await day4.getByRole('button', { name: '+ 행사·매장 추가' }).click()
     let dlg = page.getByRole('dialog', { name: '4일차 · 1/12 (화)에 행사 추가' })
     await expect(dlg).toBeVisible()
     const pick = dlg.getByRole('button', { name: /가상 겨울 팝업스토어 B/ })
@@ -251,7 +251,7 @@ test.describe('일정 추가 안내 (기간 밖 / 중복)', () => {
     await expect(dlg).toBeHidden()
 
     // 같은 날 한 번 더
-    await day4.getByRole('button', { name: '+ 관심 행사 추가' }).click()
+    await day4.getByRole('button', { name: '+ 행사·매장 추가' }).click()
     dlg = page.getByRole('dialog', { name: '4일차 · 1/12 (화)에 행사 추가' })
     await expect(dlg.getByRole('button', { name: /가상 겨울 팝업스토어 B/ })).toContainText('이미 추가됨 · 중복')
     await dlg.getByRole('button', { name: /가상 겨울 팝업스토어 B/ }).click()

@@ -194,3 +194,20 @@ describe('itemsOutsideTrip / itemsByDate / tripDates', () => {
     expect(tripDatesWithinEvent(trip, makeEvent({ startDate: '2026-10-01', endDate: '2026-10-25' }))).toEqual([])
   })
 })
+
+describe('long trips and permanent shops', () => {
+  it('itemsOutsideTrip also catches items beyond the 366 rendered days', async () => {
+    const { itemsOutsideTrip } = await import('../lib/trip')
+    const trip = {
+      id: 't', name: 't', startDate: '2027-01-01', endDate: '2028-06-30', timezone: 'Asia/Tokyo', city: '',
+      accommodation: { name: '', address: '', memo: '' }, createdAt: '', updatedAt: '',
+      items: [{ id: 'a', date: '2028-03-01', kind: 'place' as const, eventId: null, placeName: 'x', placeAddress: '', time: null, memo: '' }],
+    }
+    expect(itemsOutsideTrip(trip).map((i) => i.id)).toEqual(['a'])
+  })
+  it('isDateInEventPeriod is true for a dateless shop', async () => {
+    const { isDateInEventPeriod } = await import('../lib/trip')
+    expect(isDateInEventPeriod({ startDate: null, endDate: null, type: 'shop' }, '2027-01-10')).toBe(true)
+    expect(isDateInEventPeriod({ startDate: null, endDate: null, type: 'cafe' }, '2027-01-10')).toBe('unknown')
+  })
+})

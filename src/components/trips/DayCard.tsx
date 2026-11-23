@@ -59,7 +59,7 @@ export function DayCard({
 
       <div className="tp-day__add">
         <Button onClick={() => onAddPlace(date)}>+ 장소 직접 추가</Button>
-        <Button onClick={() => onAddEvent(date)}>+ 관심 행사 추가</Button>
+        <Button onClick={() => onAddEvent(date)}>+ 행사·매장 추가</Button>
       </div>
     </section>
   )

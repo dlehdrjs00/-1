@@ -8,7 +8,7 @@ import type {
   WorkId,
 } from '../types'
 import { EVENT_TYPES, WORKS } from '../constants'
-import { isValidDate, isValidLocalDateTime, isValidTime, isValidTimezone } from './date'
+import { daysBetween, isValidDate, isValidLocalDateTime, isValidTime, isValidTimezone } from './date'
 
 export type ValidationResult = { ok: true; data: AppData } | { ok: false; errors: string[] }
 
@@ -17,6 +17,8 @@ const TYPE_IDS = new Set<string>(EVENT_TYPES.map((t) => t.id))
 const RES_REQ = new Set<string>(['required', 'not_required', 'unknown'])
 
 const MAX_ERRORS = 8
+/** eachDate 가 만들 수 있는 최대 일수와 같게 유지 */
+export const MAX_TRIP_DAYS = 366
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -137,6 +139,9 @@ function validateTrip(raw: unknown, idx: number, errors: string[]): Trip | null 
   if (!str(raw.name).trim()) errors.push(`${where}: 여행 이름이 없습니다.`)
   if (!isValidDate(raw.startDate) || !isValidDate(raw.endDate)) errors.push(`${where}: 여행 날짜 형식이 올바르지 않습니다.`)
   else if ((raw.startDate as string) > (raw.endDate as string)) errors.push(`${where}: 시작일이 종료일보다 늦습니다.`)
+  else if (daysBetween(raw.startDate as string, raw.endDate as string) + 1 > MAX_TRIP_DAYS) {
+    errors.push(`${where}: 여행 기간이 너무 깁니다 (최대 ${MAX_TRIP_DAYS}일).`)
+  }
   if (!isValidTimezone(raw.timezone)) errors.push(`${where}: 시간대가 올바르지 않습니다.`)
   const acc = isObj(raw.accommodation) ? raw.accommodation : {}
   if (!Array.isArray(raw.items)) errors.push(`${where}: 일정 목록(items)이 배열이 아닙니다.`)
@@ -168,8 +173,11 @@ export function validateAppData(input: unknown): ValidationResult {
   if (input.app !== undefined && input.app !== 'subcul-trip-planner') {
     return { ok: false, errors: ['다른 앱에서 내보낸 파일로 보입니다.'] }
   }
+  if (input.schemaVersion === undefined) {
+    return { ok: false, errors: ['이 앱에서 내보낸 백업 파일이 아니에요.'] }
+  }
   if (input.schemaVersion !== 1) {
-    return { ok: false, errors: [`지원하지 않는 데이터 버전입니다. (schemaVersion: ${String(input.schemaVersion)})`] }
+    return { ok: false, errors: [`지원하지 않는 버전의 백업 파일이에요 (버전 ${String(input.schemaVersion)}).`] }
   }
   if (!Array.isArray(input.events)) errors.push('행사 목록(events)이 배열이 아닙니다.')
   if (!Array.isArray(input.favorites)) errors.push('관심 목록(favorites)이 배열이 아닙니다.')

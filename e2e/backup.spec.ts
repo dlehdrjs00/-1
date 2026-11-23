@@ -71,7 +71,7 @@ test.describe('JSON 불러오기 오류', () => {
       name: 'schemaVersion 2',
       file: 'v2.json',
       content: validShape({ schemaVersion: 2 }),
-      message: /지원하지 않는 데이터 버전입니다\. \(schemaVersion: 2\)/,
+      message: /지원하지 않는 버전의 백업 파일이에요 \(버전 2\)/,
     },
     {
       name: '빈 파일',
@@ -115,7 +115,7 @@ test.describe('JSON 불러오기 오류', () => {
     await expect(importError(page)).toContainText('first.txt')
     await upload(page, 'second.json', validShape({ schemaVersion: 2 }))
     await expect(importError(page)).toContainText('second.json')
-    await expect(importError(page)).toContainText('schemaVersion: 2')
+    await expect(importError(page)).toContainText('버전 2')
     await importError(page).getByRole('button', { name: '닫기' }).click()
     await expect(importError(page)).toHaveCount(0)
     expect((await readStored(page)).events).toHaveLength(SAMPLE_COUNT)

@@ -10,9 +10,13 @@ import { newId } from '../lib/id'
 /* 저장소 읽기/쓰기                                                      */
 /* ------------------------------------------------------------------ */
 
-export type LoadNotice = null | 'corrupt_reset'
+/**
+ * corrupt_reset:     손상된 데이터를 백업 키에 보관하고 초기 상태로 시작
+ * corrupt_no_backup: 백업 보관에도 실패 → 원본을 메모리에 들고 있으며, 사용자가 바꾸기 전까지 덮어쓰지 않는다
+ */
+export type LoadNotice = null | 'corrupt_reset' | 'corrupt_no_backup'
 
-export function loadFromStorage(): { data: AppData; notice: LoadNotice } {
+export function loadFromStorage(): { data: AppData; notice: LoadNotice; corruptRaw?: string } {
   let raw: string | null = null
   try {
     raw = localStorage.getItem(STORAGE_KEY)
@@ -31,7 +35,7 @@ export function loadFromStorage(): { data: AppData; notice: LoadNotice } {
   try {
     localStorage.setItem(STORAGE_BACKUP_KEY, raw)
   } catch {
-    /* ignore */
+    return { data: createInitialData(), notice: 'corrupt_no_backup', corruptRaw: raw }
   }
   return { data: createInitialData(), notice: 'corrupt_reset' }
 }
@@ -107,6 +111,8 @@ export interface AppStore {
   /** 마지막 저장 실패 여부 (용량 초과 등) */
   saveError: boolean
   loadNotice: LoadNotice
+  /** 백업하지 못한 손상 데이터 원문 (내려받기용) */
+  corruptRaw: string | null
   dismissLoadNotice(): void
 
   getEvent(id: string): EventItem | undefined
@@ -151,8 +157,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const dataRef = useRef(data)
 
   useEffect(() => {
+    // 백업에 실패한 손상 데이터는 사용자가 무언가 바꾸기 전까지 덮어쓰지 않는다
+    if (initial.notice === 'corrupt_no_backup' && data === initial.data) return
     setSaveError(!saveToStorage(data))
-  }, [data])
+  }, [data, initial])
 
   // 다른 탭에서 변경된 경우 반영
   useEffect(() => {
@@ -188,6 +196,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       data: d,
       saveError,
       loadNotice,
+      corruptRaw: initial.corruptRaw ?? null,
       dismissLoadNotice: () => setLoadNotice(null),
       getEvent: (id) => d.events.find((e) => e.id === id),
       getTrip: (id) => d.trips.find((t) => t.id === id),
@@ -280,7 +289,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         commit(createInitialData())
       },
     }
-  }, [data, saveError, loadNotice, commit, mapTrip])
+  }, [data, saveError, loadNotice, initial, commit, mapTrip])
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
 }

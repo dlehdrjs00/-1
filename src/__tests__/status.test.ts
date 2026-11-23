@@ -157,3 +157,12 @@ describe('orUnknown', () => {
     expect(orUnknown('가상 카페')).toBe('가상 카페')
   })
 })
+
+describe('permanent shop', () => {
+  it('a dateless shop is permanent; a dateless non-shop stays unknown', () => {
+    expect(getEventStatus({ ...ev({ startDate: null, endDate: null }), type: 'shop' }, NOW)).toBe('permanent')
+    expect(getEventStatus({ ...ev({ startDate: null, endDate: null }), type: 'popup' }, NOW)).toBe('unknown')
+    // a shop with known dates follows the normal rules
+    expect(getEventStatus({ ...ev({ startDate: '2026-12-01', endDate: '2026-12-31' }), type: 'shop' }, NOW)).toBe('upcoming')
+  })
+})

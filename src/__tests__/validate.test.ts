@@ -145,10 +145,12 @@ describe('validateAppData — rejects', () => {
   })
 
   it('wrong or missing schemaVersion', () => {
-    for (const v of [2, '1', 0, undefined]) {
+    for (const v of [2, '1', 0]) {
       const errs = expectErrors({ ...makeData(), schemaVersion: v })
-      expect(errs[0]).toContain('지원하지 않는 데이터 버전')
+      expect(errs[0]).toContain('지원하지 않는 버전의 백업 파일')
+      expect(errs[0]).not.toContain('undefined')
     }
+    expect(expectErrors({ ...makeData(), schemaVersion: undefined })[0]).toBe('이 앱에서 내보낸 백업 파일이 아니에요.')
   })
 
   it('a different app marker', () => {
@@ -325,5 +327,12 @@ describe('validateAppData — cleans dangling references (not an error)', () => 
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(res.data.trips[0].items[0].id).toMatch(/^item_\w+/)
+  })
+})
+
+describe('validateAppData — trip length limit', () => {
+  it('rejects trips longer than 366 days', () => {
+    const res = validateAppData(JSON.parse(JSON.stringify(makeData({ trips: [makeTrip({ startDate: '2027-01-01', endDate: '2028-06-30' })] }))))
+    expect(res.ok).toBe(false)
   })
 })

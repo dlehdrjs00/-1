@@ -280,14 +280,15 @@ describe('loadFromStorage', () => {
     expectInitialShape(data)
   })
 
-  it('backup write failure (quota) still resets with a notice', () => {
+  it('backup write failure (quota) resets with a distinct notice and keeps the raw original', () => {
     const ls = memoryStorage({ [STORAGE_KEY]: 'not json' })
     ls.setItem = () => {
       throw new Error('QuotaExceededError')
     }
     vi.stubGlobal('localStorage', ls)
-    const { data, notice } = loadFromStorage()
-    expect(notice).toBe('corrupt_reset')
+    const { data, notice, corruptRaw } = loadFromStorage()
+    expect(notice).toBe('corrupt_no_backup')
+    expect(corruptRaw).toBe('not json')
     expectInitialShape(data)
   })
 })

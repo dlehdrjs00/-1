@@ -10,10 +10,11 @@ import {
   hasErrors,
   orderedErrors,
   validateEventForm,
+  type EventFormErrors,
   type EventFormField,
   type EventFormValues,
 } from '../lib/eventForm'
-import { goBack, Link, navigate } from '../router'
+import { goBack, Link, navigate, setNavigationGuard } from '../router'
 import { useStore } from '../store/AppStore'
 import { Button, Chip, EmptyState, Field, Notice, PageHeader, useConfirm, useToast } from '../components/ui'
 import { FieldSet, FormSection } from '../components/manage/FormBits'
@@ -76,7 +77,21 @@ function EventForm({ existing }: { existing?: EventItem }) {
     return def !== undefined && def !== existing.timezone
   })
 
-  const errors = useMemo(() => (submitted ? validateEventForm(values) : {}), [submitted, values])
+  // 날짜/시각 입력이 덜 채워진 경우 브라우저는 value 를 '' 로 돌려준다 → 조용히 버려지지 않도록 별도 오류로 표시
+  const [badInputErrors, setBadInputErrors] = useState<EventFormErrors>({})
+  const scanBadInputs = useCallback((): EventFormErrors => {
+    const out: EventFormErrors = {}
+    formRef.current?.querySelectorAll<HTMLInputElement>('input[type="date"], input[type="datetime-local"]').forEach((el) => {
+      if (!el.validity.badInput) return
+      const field = el.closest<HTMLElement>('[data-field]')?.dataset.field as EventFormField | undefined
+      if (field) out[field] = el.type === 'date' ? '날짜를 끝까지 입력하세요.' : '날짜와 시각을 모두 입력하세요.'
+    })
+    return out
+  }, [])
+  const errors = useMemo<EventFormErrors>(
+    () => (submitted ? { ...validateEventForm(values), ...badInputErrors } : {}),
+    [submitted, values, badInputErrors],
+  )
   const errorList = orderedErrors(errors)
   const dirty = !eventFormEquals(values, initial)
 
@@ -90,6 +105,25 @@ function EventForm({ existing }: { existing?: EventItem }) {
 
   const toggleWork = (w: EventFormValues['works'][number]) =>
     setValues((prev) => ({ ...prev, works: prev.works.includes(w) ? prev.works.filter((x) => x !== w) : [...prev.works, w] }))
+
+  // 저장하지 않은 변경이 있으면 메뉴 이동 전에 확인
+  const releaseGuard = useRef<(() => void) | null>(null)
+  useEffect(() => {
+    if (!dirty) return
+    const release = setNavigationGuard(() =>
+      confirm({
+        title: '저장하지 않고 나갈까요?',
+        message: '입력한 내용은 저장되지 않아요.',
+        confirmLabel: '나가기',
+        danger: true,
+      }),
+    )
+    releaseGuard.current = release
+    return () => {
+      release()
+      releaseGuard.current = null
+    }
+  }, [dirty, confirm])
 
   // 저장하지 않은 변경이 있으면 새로고침/탭 닫기 전에 경고
   useEffect(() => {
@@ -119,7 +153,9 @@ function EventForm({ existing }: { existing?: EventItem }) {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    const errs = validateEventForm(values)
+    const bad = scanBadInputs()
+    setBadInputErrors(bad)
+    const errs = { ...validateEventForm(values), ...bad }
     if (hasErrors(errs)) {
       setSubmitted(true)
       setFocusReq((prev) => ({ field: orderedErrors(errs)[0].field, n: (prev?.n ?? 0) + 1 }))
@@ -134,7 +170,13 @@ function EventForm({ existing }: { existing?: EventItem }) {
       savedId = store.addEvent(input).id
     }
     toast('저장했어요')
-    navigate(`/events/${encodeURIComponent(savedId)}`, { replace: true })
+    releaseGuard.current?.()
+    if (existing) {
+      // 수정: 들어온 화면(상세·정보 관리)으로 돌아간다. 바로 열었으면 상세로.
+      goBack(`/events/${encodeURIComponent(savedId)}`)
+    } else {
+      navigate(`/events/${encodeURIComponent(savedId)}`, { replace: true })
+    }
   }
 
   const onCancel = async () => {
@@ -200,7 +242,7 @@ function EventForm({ existing }: { existing?: EventItem }) {
         </Notice>
       )}
 
-      <form ref={formRef} className="ef-form" noValidate onSubmit={onSubmit} aria-label={isEdit ? '행사 수정' : '행사 등록'}>
+      <form ref={formRef} className="ef-form" noValidate onSubmit={onSubmit} onBlur={() => submitted && setBadInputErrors(scanBadInputs())} aria-label={isEdit ? '행사 수정' : '행사 등록'}>
         {/* ---------- 기본 정보 ---------- */}
         <FormSection title="기본 정보">
           <div data-field="title">
@@ -354,7 +396,10 @@ function EventForm({ existing }: { existing?: EventItem }) {
                       {countryKey} 기본 시간대로 맞추기
                     </button>
                   ) : (
-                    !tzManual && '국가를 고르면 자동으로 맞춰져요.'
+                    !tzManual &&
+                    (countryKey && !countryTz
+                      ? '이 국가는 시간대를 자동으로 맞추지 않아요. 직접 골라 주세요.'
+                      : '국가를 고르면 자동으로 맞춰져요.')
                   )}
                 </>
               }

@@ -320,13 +320,11 @@ test.describe('저장소 · 기타', () => {
 })
 
 /*
- * 알려진 문제 (앱 버그). 고쳐지면 test.fail 이 '예상과 달리 통과'로 알려 주므로 그때 test.fail 을 지운다.
+ * 이전에 알려진 문제였던 항목 (수정됨)
  */
-test.describe('알려진 문제', () => {
-  // APP BUG(낮음): 상세의 '← 행사 목록' 버튼은 history.back() 이라, 새 행사를 저장한 직후(등록 폼이 상세로
-  // replace 됨) 누르면 행사 목록이 아니라 정보 관리(#/manage)로 간다. 관심/내 여행에서 들어온 경우도 같다.
-  test('새 행사 저장 직후 상세의 ‘← 행사 목록’은 행사 목록으로 가야 한다', async ({ page }) => {
-    test.fail(true, '앱 버그: goBack() 이 직전 화면(#/manage)으로 돌아가 버튼 이름과 다르게 동작')
+test.describe('뒤로 가기 · 이동 확인', () => {
+  // 상세의 버튼은 '← 뒤로' — 들어온 화면으로 돌아간다. 새 행사를 저장한 직후라면 등록을 시작한 정보 관리로.
+  test('새 행사 저장 직후 상세의 ‘← 뒤로’는 등록을 시작한 화면으로 돌아간다', async ({ page }) => {
     await openRoute(page, '/manage')
     await page.getByRole('link', { name: '+ 행사 등록' }).first().click()
     const form = eventForm(page)
@@ -334,17 +332,46 @@ test.describe('알려진 문제', () => {
     await form.getByRole('group', { name: '관련 작품' }).getByRole('button', { name: '원신' }).click()
     await form.getByRole('button', { name: '저장', exact: true }).click()
     await expect(page).toHaveURL(/#\/events\/evt/)
-    await page.getByRole('button', { name: '행사 목록' }).click()
-    await expect(page).toHaveURL(/#\/events$/, { timeout: 2000 })
+    await page.getByRole('button', { name: '뒤로' }).click()
+    await expect(page).toHaveURL(/#\/manage$/, { timeout: 2000 })
+  })
+
+  test('상세 주소를 바로 연 경우 ‘← 뒤로’는 앱 밖이 아니라 행사 목록으로 간다', async ({ page }) => {
+    await openRoute(page, '/events/sample_001')
+    await page.getByRole('button', { name: '뒤로' }).click()
+    await expect(page).toHaveURL(/#\/events$/)
+  })
+
+  test('행사 수정 저장 후 상세로 돌아오고, 뒤로는 목록으로 간다 (중복 기록 없음)', async ({ page }) => {
+    await openRoute(page, '/events')
+    await page.getByRole('link', { name: /가상 콜라보 카페 A/ }).first().click()
+    await expect(page).toHaveURL(/#\/events\/sample_001$/)
+    await page.getByRole('button', { name: '수정' }).click()
+    await expect(page).toHaveURL(/#\/manage\/edit\/sample_001$/)
+    await eventForm(page).getByRole('button', { name: '저장', exact: true }).click()
+    await expect(page).toHaveURL(/#\/events\/sample_001$/)
+    await page.getByRole('button', { name: '뒤로' }).click()
+    await expect(page).toHaveURL(/#\/events$/)
   })
 
   // APP BUG(낮음): 행사 등록/수정 폼은 '취소'와 새로고침(beforeunload)에는 저장 안 한 변경을 경고하지만,
   // 하단/상단 메뉴로 다른 탭에 가면 경고 없이 입력 내용이 사라진다.
   test('작성 중인 행사 폼에서 메뉴로 이동하면 저장하지 않고 나갈지 묻는다', async ({ page }) => {
-    test.fail(true, '앱 버그: 메뉴 이동 시 저장하지 않은 변경 확인이 없음')
     await openRoute(page, '/manage/new')
     await eventForm(page).getByRole('textbox', { name: '행사명' }).fill('작성 중인 제목')
     await navTo(page, '행사')
-    await expect(page.getByRole('dialog', { name: '저장하지 않고 나갈까요?' })).toBeVisible({ timeout: 2000 })
+    const dlg = page.getByRole('dialog', { name: '저장하지 않고 나갈까요?' })
+    await expect(dlg).toBeVisible({ timeout: 2000 })
+    await dlg.getByRole('button', { name: '취소' }).click()
+    await expect(page).toHaveURL(/#\/manage\/new$/)
+    await expect(eventForm(page).getByRole('textbox', { name: '행사명' })).toHaveValue('작성 중인 제목')
+    await navTo(page, '행사')
+    await page.getByRole('dialog', { name: '저장하지 않고 나갈까요?' }).getByRole('button', { name: '나가기' }).click()
+    await expect(page).toHaveURL(/#\/events$/)
+  })
+
+  test('잘못된 % 인코딩 주소는 빈 화면 대신 찾을 수 없음 안내', async ({ page }) => {
+    await openRoute(page, '/events/%E0%A4%A')
+    await expect(page.getByText('페이지를 찾을 수 없어요')).toBeVisible()
   })
 })

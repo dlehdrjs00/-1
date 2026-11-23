@@ -71,18 +71,21 @@ export function weekday(d: DateOnly): string {
   return WEEKDAYS[parseDate(d).getUTCDay()]
 }
 
-/** '2027. 1. 9. (토)' */
+/** 줄바꿈되지 않는 공백 — 날짜 한 덩어리('2027. 1. 9. (토)')가 중간에서 끊기지 않도록 */
+const NBSP = '\u00A0'
+
+/** '2027. 1. 9. (토)' (내부 공백은 줄바꿈 없는 공백) */
 export function formatDate(d: DateOnly | null | undefined, opts: { weekday?: boolean } = { weekday: true }): string {
   if (!d || !isValidDate(d)) return '확인 필요'
   const [y, m, day] = d.split('-').map(Number)
-  return `${y}. ${m}. ${day}.${opts.weekday === false ? '' : ` (${weekday(d)})`}`
+  return `${y}.${NBSP}${m}.${NBSP}${day}.${opts.weekday === false ? '' : `${NBSP}(${weekday(d)})`}`
 }
 
 /** '1/9 (토)' 짧은 형식 */
 export function formatDateShort(d: DateOnly | null | undefined): string {
   if (!d || !isValidDate(d)) return '확인 필요'
   const [, m, day] = d.split('-').map(Number)
-  return `${m}/${day} (${weekday(d)})`
+  return `${m}/${day}${NBSP}(${weekday(d)})`
 }
 
 /** 기간 표시. 한쪽이 없으면 해당 쪽을 '확인 필요'로 */
@@ -99,7 +102,7 @@ export function timezoneLabel(tz: string): string {
 /** '2026. 12. 1. (화) 18:00 (일본 시간)' */
 export function formatLocalDateTime(v: LocalDateTime | null | undefined, tz: string): string {
   if (!v || !isValidLocalDateTime(v)) return '확인 필요'
-  return `${formatDate(v.slice(0, 10))} ${v.slice(11)} (${timezoneLabel(tz)})`
+  return `${formatDate(v.slice(0, 10))}${NBSP}${v.slice(11)} (${timezoneLabel(tz)})`
 }
 
 /** start~end 사이의 모든 날짜 (양 끝 포함). 최대 366일 */

@@ -27,21 +27,28 @@ export default function TripsPage({ tripId }: { tripId?: string }) {
   const [editItemId, setEditItemId] = useState<string | null>(null)
   const [addPlaceDate, setAddPlaceDate] = useState<DateOnly | null>(null)
   const [addEventDate, setAddEventDate] = useState<DateOnly | null>(null)
-  const pendingFocus = useRef<string | null>(null)
+  const pendingFocus = useRef<{ id: string; dir: -1 | 1 } | null>(null)
 
-  // 주소로 직접 연 여행을 활성 여행으로 (다른 화면의 '여행에 추가' 기본값과 맞추기 위해)
+  // 주소로 직접 연 여행을 활성 여행으로 (다른 화면의 '여행에 추가' 기본값과 맞추기 위해).
+  // 경로가 바뀔 때 한 번만 맞춘다 — 다른 탭과 activeTripId 를 서로 덮어쓰는 무한 반복을 막기 위해.
+  const syncedFor = useRef<string | null>(null)
+  const tripFound = !!trip
+  const setActiveTrip = store.setActiveTrip
+  const activeTripId = store.data.activeTripId
   useEffect(() => {
-    if (tripId && trip && store.data.activeTripId !== trip.id) store.setActiveTrip(trip.id)
-  }, [tripId, trip, store])
+    if (!tripId || !tripFound || syncedFor.current === tripId) return
+    syncedFor.current = tripId
+    if (activeTripId !== tripId) setActiveTrip(tripId)
+  }, [tripId, tripFound, activeTripId, setActiveTrip])
 
   // 순서 바꾸기 후 버튼 포커스 유지 (키보드 사용자용)
   useEffect(() => {
-    const key = pendingFocus.current
-    if (!key) return
+    const pf = pendingFocus.current
+    if (!pf) return
     pendingFocus.current = null
-    const [id, dir] = key.split(':')
-    const el = document.querySelector<HTMLButtonElement>(`[data-move="${id}:${dir}"]`)
-    const other = document.querySelector<HTMLButtonElement>(`[data-move="${id}:${dir === '1' ? '-1' : '1'}"]`)
+    const btns = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-move]'))
+    const el = btns.find((b) => b.dataset.move === `${pf.id}:${pf.dir}`)
+    const other = btns.find((b) => b.dataset.move === `${pf.id}:${-pf.dir}`)
     if (el && !el.disabled) el.focus()
     else other?.focus()
   })
@@ -50,7 +57,7 @@ export default function TripsPage({ tripId }: { tripId?: string }) {
   const closeEditItem = useCallback(() => setEditItemId(null), [])
   const closeAddPlace = useCallback(() => setAddPlaceDate(null), [])
   const closeAddEvent = useCallback(() => setAddEventDate(null), [])
-  const onCreated = useCallback((t: { id: string }) => navigate(`/trips/${t.id}`), [])
+  const onCreated = useCallback((t: { id: string }) => navigate(`/trips/${encodeURIComponent(t.id)}`), [])
 
   const createModal = tripForm === 'create' && (
     <TripFormModal onClose={closeTripForm} onCreated={onCreated} />
@@ -103,7 +110,7 @@ export default function TripsPage({ tripId }: { tripId?: string }) {
     item.kind === 'event' ? (store.getEvent(item.eventId ?? '')?.title ?? '삭제된 행사') : item.placeName || '이름 없는 장소'
 
   const onMove = (item: ItineraryItem, dir: -1 | 1) => {
-    pendingFocus.current = `${item.id}:${dir}`
+    pendingFocus.current = { id: item.id, dir }
     store.moveItineraryItem(trip.id, item.id, dir)
   }
 
@@ -140,7 +147,7 @@ export default function TripsPage({ tripId }: { tripId?: string }) {
 
   const selectTrip = (id: string) => {
     store.setActiveTrip(id)
-    navigate(`/trips/${id}`)
+    navigate(`/trips/${encodeURIComponent(id)}`)
   }
 
   return (

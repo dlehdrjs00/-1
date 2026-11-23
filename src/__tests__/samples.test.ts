@@ -101,7 +101,7 @@ describe('sample events — coverage', () => {
 
   it('has every event status and every reservation status as of 2026-11-23', () => {
     const es = new Set<EventStatus>(samples.map((e) => getEventStatus(e, NOW)))
-    expect([...es].sort()).toEqual(['ended', 'ongoing', 'unknown', 'upcoming'])
+    expect([...es].sort()).toEqual(['ended', 'ongoing', 'permanent', 'unknown', 'upcoming'])
     const rs = new Set<ReservationStatus>(samples.map((e) => getReservationStatus(e, NOW)))
     expect([...rs].sort()).toEqual(['before_open', 'closed', 'not_required', 'open', 'unknown'])
   })
@@ -125,7 +125,7 @@ describe('sample events — specific scenarios', () => {
     ['sample_009', 'ongoing', 'unknown'],
     ['sample_010', 'upcoming', 'closed'],
     ['sample_011', 'unknown', 'unknown'],
-    ['sample_012', 'unknown', 'not_required'],
+    ['sample_012', 'permanent', 'not_required'],
     ['sample_013', 'upcoming', 'open'],
   ]
   it.each(scenarios)('%s → %s / %s', (id, status, reservation) => {
@@ -173,8 +173,8 @@ describe('sample events — specific scenarios', () => {
     const e = byId('sample_012')
     expect(e).toMatchObject({ type: 'shop', startDate: null, endDate: null, reservationRequired: 'not_required' })
     for (const d of ['2027-01-09', '2027-01-13']) {
-      // only an informational 'period_unknown' warning — never 'out_of_period'
-      expect(getAddWarnings(TRIP, d, e).map((w) => w.kind)).toEqual(['period_unknown'])
+      // 상설 매장: 기간 경고 없이 어느 날짜에나 추가 가능
+      expect(getAddWarnings(TRIP, d, e)).toEqual([])
     }
   })
 

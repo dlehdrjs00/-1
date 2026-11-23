@@ -42,7 +42,7 @@ export function ItineraryItemCard({ trip, item, position, showDate, onMove, onEd
         </div>
 
         <p className="tp-item__title">
-          {event ? <Link to={`/events/${event.id}`}>{title}</Link> : <span>{title}</span>}
+          {event ? <Link to={`/events/${encodeURIComponent(event.id)}`}>{title}</Link> : <span>{title}</span>}
           {event?.isSample && (
             <>
               {' '}

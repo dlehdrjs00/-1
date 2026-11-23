@@ -118,8 +118,15 @@ export const REGION_SUGGESTIONS: Record<string, string[]> = {
 export const COUNTRY_DEFAULT_TZ: Record<string, string> = {
   일본: 'Asia/Tokyo',
   한국: 'Asia/Seoul',
+  대한민국: 'Asia/Seoul',
   중국: 'Asia/Shanghai',
   대만: 'Asia/Taipei',
+  타이완: 'Asia/Taipei',
+  홍콩: 'Asia/Hong_Kong',
+  싱가포르: 'Asia/Singapore',
+  태국: 'Asia/Bangkok',
+  영국: 'Europe/London',
+  프랑스: 'Europe/Paris',
 }
 
 export const STORAGE_KEY = 'subcul-trip-planner:v1'

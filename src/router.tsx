@@ -34,23 +34,49 @@ export function navigate(path: string, opts: { replace?: boolean } = {}) {
  * idx 가 0 이면 앱에 처음 들어온 항목이므로 '뒤로'는 history.back() 대신 fallback 으로 이동한다.
  */
 let currentIdx = 0
+function syncIdxFromState(): boolean {
+  const s = window.history.state as { idx?: number } | null
+  if (typeof s?.idx === 'number') {
+    currentIdx = s.idx
+    return true
+  }
+  return false
+}
 if (typeof window !== 'undefined') {
-  const st = window.history.state as { idx?: number } | null
-  if (typeof st?.idx === 'number') currentIdx = st.idx
-  else window.history.replaceState({ idx: 0 }, '')
+  if (!syncIdxFromState()) window.history.replaceState({ idx: 0 }, '')
   window.addEventListener('hashchange', () => {
-    const s = window.history.state as { idx?: number } | null
-    if (typeof s?.idx === 'number') currentIdx = s.idx
-    else {
+    if (!syncIdxFromState()) {
       currentIdx += 1
       window.history.replaceState({ idx: currentIdx }, '')
     }
+  })
+  // 같은 해시 사이를 오가는 경우 hashchange 가 생기지 않으므로 popstate 로도 동기화
+  window.addEventListener('popstate', () => {
+    syncIdxFromState()
   })
 }
 
 export function goBack(fallback = '/events') {
   if (currentIdx > 0) window.history.back()
   else navigate(fallback, { replace: true })
+}
+
+/* ---------------- 이동 확인 (저장하지 않은 변경 등) ---------------- */
+
+type NavGuard = () => Promise<boolean>
+let navGuard: NavGuard | null = null
+
+/** 메뉴 링크 이동 전에 확인할 함수를 등록한다. 반환값으로 해제 */
+export function setNavigationGuard(fn: NavGuard): () => void {
+  navGuard = fn
+  return () => {
+    if (navGuard === fn) navGuard = null
+  }
+}
+
+/** 경로 세그먼트를 안전하게 인코딩해 경로를 만든다. 예: pathTo('events', id) */
+export function pathTo(...segments: string[]): string {
+  return '/' + segments.map((x) => encodeURIComponent(x)).join('/')
 }
 
 export function usePath(): string {
@@ -73,8 +99,13 @@ export function matchPath(pattern: string, path: string): Record<string, string>
   if (p.length !== a.length) return null
   const params: Record<string, string> = {}
   for (let i = 0; i < p.length; i++) {
-    if (p[i].startsWith(':')) params[p[i].slice(1)] = decodeURIComponent(a[i])
-    else if (p[i] !== a[i]) return null
+    if (p[i].startsWith(':')) {
+      try {
+        params[p[i].slice(1)] = decodeURIComponent(a[i])
+      } catch {
+        return null // 잘못된 % 인코딩 → 찾을 수 없는 페이지
+      }
+    } else if (p[i] !== a[i]) return null
   }
   return params
 }
@@ -85,6 +116,16 @@ export function Link({ to, onClick, ...rest }: AnchorHTMLAttributes<HTMLAnchorEl
       href={`#${to}`}
       onClick={(e: MouseEvent<HTMLAnchorElement>) => {
         onClick?.(e)
+        if (e.defaultPrevented || !navGuard) return
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+        e.preventDefault()
+        const guard = navGuard
+        void guard().then((ok) => {
+          if (ok) {
+            if (navGuard === guard) navGuard = null
+            navigate(to)
+          }
+        })
       }}
       {...rest}
     />

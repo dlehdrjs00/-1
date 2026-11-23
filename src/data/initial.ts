@@ -11,7 +11,7 @@ export function createDefaultTrip(): Trip {
     endDate: '2027-01-13',
     timezone: 'Asia/Tokyo',
     city: '도쿄',
-    accommodation: { name: '아사쿠사바시 근처 숙소', address: '', memo: '숙소 이름·주소를 입력하세요.' },
+    accommodation: { name: '아사쿠사바시 근처 숙소', address: '', memo: '' },
     items: [],
     createdAt: now,
     updatedAt: now,

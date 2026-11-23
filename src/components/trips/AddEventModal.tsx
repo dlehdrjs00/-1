@@ -3,6 +3,7 @@ import type { DateOnly, EventItem, Trip } from '../../types'
 import { WORK_MAP } from '../../constants'
 import { formatDateRange, formatDateShort, isValidTime, timezoneLabel } from '../../lib/date'
 import { getAddWarnings, hasDuplicateEvent, isDateInEventPeriod } from '../../lib/trip'
+import { isPermanentShop } from '../../lib/status'
 import { useStore } from '../../store/AppStore'
 import { StatusBadges, WorkTags } from '../EventBits'
 import { Badge, Button, Chip, EmptyState, Field, Modal, Notice, SampleBadge, useToast } from '../ui'
@@ -213,11 +214,12 @@ export function AddEventModal({ trip, date, dayNo, onClose }: { trip: Trip; date
                   </span>
                   <WorkTags works={e.works} />
                   <span className="tp-pick__meta">
-                    {formatDateRange(e.startDate, e.endDate)}
-                    {e.venue ? ` · ${e.venue}` : ''}
+                    {isPermanentShop(e) ? '상설 (기간 없음)' : formatDateRange(e.startDate, e.endDate)}
+                    {' · '}
+                    {e.venue.trim() ? e.venue : <span className="unknown">장소 확인 필요</span>}
                   </span>
                   <span className="tp-pick__badges">
-                    {p === true && <Badge tone="success">이 날짜 진행</Badge>}
+                    {p === true && (isPermanentShop(e) ? <Badge tone="accent">상설</Badge> : <Badge tone="success">이 날짜 진행</Badge>)}
                     {p === 'unknown' && <Badge tone="warning">기간 확인 필요</Badge>}
                     {p === false && <Badge tone="danger">행사 기간 밖</Badge>}
                     {isDup && <Badge tone="warning">이미 추가됨 · 중복</Badge>}

@@ -133,40 +133,43 @@ describe('nowInTimezone / todayInTimezone (fixed clock)', () => {
   })
 })
 
+/** 날짜 문자열의 줄바꿈 없는 공백(U+00A0)을 일반 공백으로 바꿔 비교 */
+const sp = (v: string) => v.replace(/\u00A0/g, ' ')
+
 describe('formatDate / formatDateShort / formatDateRange / formatLocalDateTime', () => {
   it('formats with weekday by default', () => {
-    expect(formatDate('2027-01-09')).toBe('2027. 1. 9. (토)')
-    expect(formatDate('2026-12-01')).toBe('2026. 12. 1. (화)')
-    expect(formatDate('2027-01-09', { weekday: false })).toBe('2027. 1. 9.')
+    expect(sp(formatDate('2027-01-09'))).toBe('2027. 1. 9. (토)')
+    expect(sp(formatDate('2026-12-01'))).toBe('2026. 12. 1. (화)')
+    expect(sp(formatDate('2027-01-09', { weekday: false }))).toBe('2027. 1. 9.')
     expect(weekday('2026-11-23')).toBe('월')
   })
 
   it("shows '확인 필요' for null/undefined/invalid", () => {
-    expect(formatDate(null)).toBe('확인 필요')
-    expect(formatDate(undefined)).toBe('확인 필요')
-    expect(formatDate('')).toBe('확인 필요')
-    expect(formatDate('2026-02-30')).toBe('확인 필요')
-    expect(formatDateShort(null)).toBe('확인 필요')
+    expect(sp(formatDate(null))).toBe('확인 필요')
+    expect(sp(formatDate(undefined))).toBe('확인 필요')
+    expect(sp(formatDate(''))).toBe('확인 필요')
+    expect(sp(formatDate('2026-02-30'))).toBe('확인 필요')
+    expect(sp(formatDateShort(null))).toBe('확인 필요')
   })
 
   it('formats short dates', () => {
-    expect(formatDateShort('2027-01-12')).toBe('1/12 (화)')
+    expect(sp(formatDateShort('2027-01-12'))).toBe('1/12 (화)')
   })
 
   it('formats ranges incl. unknown ends', () => {
-    expect(formatDateRange('2027-01-09', '2027-01-13')).toBe('2027. 1. 9. (토) ~ 2027. 1. 13. (수)')
-    expect(formatDateRange('2027-01-12', '2027-01-12')).toBe('2027. 1. 12. (화)')
-    expect(formatDateRange(null, null)).toBe('기간 확인 필요')
-    expect(formatDateRange('2027-01-09', null)).toBe('2027. 1. 9. (토) ~ 종료일 확인 필요')
-    expect(formatDateRange(null, '2027-01-13')).toBe('시작일 확인 필요 ~ 2027. 1. 13. (수)')
+    expect(sp(formatDateRange('2027-01-09', '2027-01-13'))).toBe('2027. 1. 9. (토) ~ 2027. 1. 13. (수)')
+    expect(sp(formatDateRange('2027-01-12', '2027-01-12'))).toBe('2027. 1. 12. (화)')
+    expect(sp(formatDateRange(null, null))).toBe('기간 확인 필요')
+    expect(sp(formatDateRange('2027-01-09', null))).toBe('2027. 1. 9. (토) ~ 종료일 확인 필요')
+    expect(sp(formatDateRange(null, '2027-01-13'))).toBe('시작일 확인 필요 ~ 2027. 1. 13. (수)')
   })
 
   it('formats local date-times with the zone label', () => {
-    expect(formatLocalDateTime('2026-12-01T18:00', 'Asia/Tokyo')).toBe('2026. 12. 1. (화) 18:00 (일본 시간)')
-    expect(formatLocalDateTime('2026-12-01T18:00', 'Asia/Seoul')).toBe('2026. 12. 1. (화) 18:00 (한국 시간)')
-    expect(formatLocalDateTime('2026-12-01T18:00', 'Etc/UTC')).toBe('2026. 12. 1. (화) 18:00 (Etc/UTC)')
-    expect(formatLocalDateTime(null, 'Asia/Tokyo')).toBe('확인 필요')
-    expect(formatLocalDateTime('2026-12-01', 'Asia/Tokyo')).toBe('확인 필요')
+    expect(sp(formatLocalDateTime('2026-12-01T18:00', 'Asia/Tokyo'))).toBe('2026. 12. 1. (화) 18:00 (일본 시간)')
+    expect(sp(formatLocalDateTime('2026-12-01T18:00', 'Asia/Seoul'))).toBe('2026. 12. 1. (화) 18:00 (한국 시간)')
+    expect(sp(formatLocalDateTime('2026-12-01T18:00', 'Etc/UTC'))).toBe('2026. 12. 1. (화) 18:00 (Etc/UTC)')
+    expect(sp(formatLocalDateTime(null, 'Asia/Tokyo'))).toBe('확인 필요')
+    expect(sp(formatLocalDateTime('2026-12-01', 'Asia/Tokyo'))).toBe('확인 필요')
   })
 })
 

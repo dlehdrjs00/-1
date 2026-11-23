@@ -19,7 +19,7 @@ function BackButton() {
   return (
     <div className="ev-back">
       <Button variant="ghost" onClick={() => goBack('/events')}>
-        <span aria-hidden>←</span> 행사 목록
+        <span aria-hidden>←</span> 뒤로
       </Button>
     </div>
   )
