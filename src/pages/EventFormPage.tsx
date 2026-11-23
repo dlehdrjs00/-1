@@ -102,17 +102,24 @@ function useEventFormDraft({
   // 수정 초안의 기준 시각: 수정을 시작할 때의 updatedAt (복구하면 그 초안의 기준 시각을 이어 받는다)
   const base = useRef<string | null>(existing?.updatedAt ?? null)
   const finished = useRef(false)
-  const state = useRef({ dirty, saveFailed })
+  const state = useRef({ dirty, saveFailed, pending })
   useEffect(() => {
-    state.current = { dirty, saveFailed }
+    state.current = { dirty, saveFailed, pending }
   })
 
-  /** 미뤄 둔 저장을 바로 실행한다. 반환: 지금 입력이 초안으로 보관되어 있는지 */
+  /**
+   * 지금 입력을 초안으로 바로 저장한다 (페이지 숨김·닫힘·화면 이탈 때).
+   * 미뤄 둔 저장이 없어도 다시 쓴다 — 다른 탭이 같은 행사를 저장하며 이 초안을 지웠을 수 있기 때문.
+   * 반환: 지금 입력이 초안으로 보관되어 있는지
+   */
   const flush = useCallback((): boolean => {
-    if (timer.current === null) return !state.current.saveFailed
-    clearTimeout(timer.current)
-    timer.current = null
+    if (timer.current !== null) {
+      clearTimeout(timer.current)
+      timer.current = null
+    }
     if (finished.current) return true
+    // 복구/버리기 선택 대기 중에는 저장된 초안을 덮어쓰지 않는다. 바뀐 것이 없으면 보관할 것도 없다.
+    if (state.current.pending || !state.current.dirty) return true
     const ok = saveEventDraft(target, latest.current, base.current)
     state.current.saveFailed = !ok
     return ok
@@ -253,10 +260,15 @@ function EventForm({ existing }: { existing?: EventItem }) {
     })
     return out
   }, [])
-  const errors = useMemo<EventFormErrors>(
-    () => (submitted ? { ...validateEventForm(values), ...badInputErrors } : {}),
-    [submitted, values, badInputErrors],
-  )
+  const errors = useMemo<EventFormErrors>(() => {
+    if (!submitted) return {}
+    const bad = { ...badInputErrors }
+    // 예약 시각 칸이 숨겨지면(필수가 아님) 그 칸의 '덜 입력됨' 오류도 남기지 않는다
+    if (values.reservationRequired !== 'required') {
+      for (const f of ['reservationStartDate', 'reservationStartTime', 'reservationEndDate', 'reservationEndTime'] as const) delete bad[f]
+    }
+    return { ...validateEventForm(values), ...bad }
+  }, [submitted, values, badInputErrors])
   const errorList = orderedErrors(errors)
   const dirty = !eventFormEquals(values, initial)
 

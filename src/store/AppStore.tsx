@@ -187,9 +187,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   // 첫 화면 표시 때 한 번 저장 (처음 실행 시 샘플·기본 여행을 저장하고, 손상 데이터는 초기 상태로 교체).
   // 단, 백업에 실패한 손상 데이터는 사용자가 무언가 바꾸기 전까지 덮어쓰지 않는다.
+  // 자식 화면의 effect(예: 주소로 연 여행을 활성 여행으로)가 먼저 commit 했을 수 있으므로 최신 값을 저장한다.
   useEffect(() => {
     if (initial.notice === 'corrupt_no_backup') return
-    persist(initial.data)
+    persist(dataRef.current)
   }, [initial])
 
   // 다른 탭에서 변경된 경우 반영
