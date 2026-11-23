@@ -1,4 +1,157 @@
-// TODO: 담당 에이전트가 구현
-export default function FavoritesPage(_props: Record<string, unknown>) {
-  return <div className="card">FavoritesPage (구현 예정)</div>
+import { useCallback, useMemo, useState } from 'react'
+import type { EventItem } from '../types'
+import { formatDateRange } from '../lib/date'
+import { Link } from '../router'
+import { useStore } from '../store/AppStore'
+import { AddToTripDialog } from '../components/AddToTripDialog'
+import { StatusBadges, TypeLabel, WorkTags } from '../components/EventBits'
+import { Button, EmptyState, Notice, PageHeader, SampleBadge, useToast } from '../components/ui'
+import { monthDay } from '../components/trips/tripFormat'
+import './trips.css'
+
+interface Removed {
+  id: string
+  index: number
+  title: string
+}
+
+export default function FavoritesPage() {
+  const store = useStore()
+  const toast = useToast()
+  const [target, setTarget] = useState<EventItem | null>(null)
+  const [removed, setRemoved] = useState<Removed | null>(null)
+  const closeDialog = useCallback(() => setTarget(null), [])
+
+  const events = useMemo(
+    () =>
+      store.data.favorites
+        .map((id) => store.data.events.find((e) => e.id === id))
+        .filter((e): e is EventItem => !!e),
+    [store.data.favorites, store.data.events],
+  )
+
+  const activeTrip = store.activeTrip
+  /** 활성 여행에 이미 들어간 날짜 (행사 id → 정렬된 날짜 목록) */
+  const addedDates = useMemo(() => {
+    const m = new Map<string, string[]>()
+    if (!activeTrip) return m
+    for (const it of activeTrip.items) {
+      if (it.kind !== 'event' || !it.eventId) continue
+      const arr = m.get(it.eventId) ?? []
+      if (!arr.includes(it.date)) arr.push(it.date)
+      m.set(it.eventId, arr)
+    }
+    for (const arr of m.values()) arr.sort()
+    return m
+  }, [activeTrip])
+
+  const unsave = (e: EventItem) => {
+    const index = store.data.favorites.indexOf(e.id)
+    if (index < 0) return
+    store.toggleFavorite(e.id)
+    setRemoved({ id: e.id, index, title: e.title })
+    toast('관심 저장을 취소했어요.', 'info')
+  }
+
+  const undo = () => {
+    if (!removed) return
+    const cur = store.data
+    if (cur.favorites.includes(removed.id) || !cur.events.some((e) => e.id === removed.id)) {
+      setRemoved(null)
+      return
+    }
+    // 원래 순서 위치로 되돌린다
+    const favorites = [...cur.favorites]
+    favorites.splice(Math.min(removed.index, favorites.length), 0, removed.id)
+    store.replaceAll({ ...cur, favorites })
+    setRemoved(null)
+    toast('다시 저장했어요.')
+  }
+
+  return (
+    <div className="favs-page">
+      <PageHeader
+        title="관심 행사"
+        subtitle={events.length ? `저장한 행사 ${events.length}개` : '가고 싶은 행사를 모아 두는 곳이에요.'}
+      />
+
+      {removed && (
+        <Notice tone="info">
+          <span className="favs-undo">
+            <span className="favs-undo__text">‘{removed.title}’ 저장을 취소했어요.</span>
+            <span className="favs-undo__actions">
+              <Button size="sm" onClick={undo}>
+                되돌리기
+              </Button>
+              <button type="button" className="icon-btn icon-btn--sm" aria-label="알림 닫기" onClick={() => setRemoved(null)}>
+                ✕
+              </button>
+            </span>
+          </span>
+        </Notice>
+      )}
+
+      {events.length === 0 ? (
+        <EmptyState
+          icon="☆"
+          title="아직 저장한 관심 행사가 없어요"
+          description="행사 목록에서 ☆ 관심 저장을 누르면 여기에 모여요. 모은 행사는 바로 여행 일정에 넣을 수 있어요."
+          action={
+            <Link to="/events" className="btn btn--primary btn--md">
+              행사 둘러보기
+            </Link>
+          }
+        />
+      ) : (
+        <ul className="favs-list">
+          {events.map((e) => {
+            const dates = addedDates.get(e.id)
+            const place = [e.venue, e.city].filter((s) => s && s.trim()).join(' · ')
+            return (
+              <li key={e.id} className="card favs-card">
+                <div className="favs-card__top">
+                  <TypeLabel event={e} />
+                  {e.isSample && <SampleBadge />}
+                </div>
+                <h2 className="favs-card__title">
+                  <Link to={`/events/${e.id}`}>{e.title}</Link>
+                </h2>
+                <WorkTags works={e.works} />
+                <dl className="favs-meta">
+                  <div>
+                    <dt>기간</dt>
+                    <dd>{formatDateRange(e.startDate, e.endDate)}</dd>
+                  </div>
+                  <div>
+                    <dt>장소</dt>
+                    <dd>{place || <span className="unknown">확인 필요</span>}</dd>
+                  </div>
+                </dl>
+                <StatusBadges event={e} />
+                {activeTrip && dates && dates.length > 0 && (
+                  <p className="favs-added">
+                    <span aria-hidden>✓</span>{' '}
+                    <Link to={`/trips/${activeTrip.id}`}>
+                      일정에 추가됨: {dates.map(monthDay).join(', ')}
+                    </Link>
+                    <span className="faint"> · {activeTrip.name}</span>
+                  </p>
+                )}
+                <div className="favs-card__actions">
+                  <Button variant="primary" onClick={() => setTarget(e)}>
+                    여행에 추가
+                  </Button>
+                  <Button variant="ghost" onClick={() => unsave(e)} aria-label={`${e.title} 저장 취소`}>
+                    <span aria-hidden>★</span> 저장 취소
+                  </Button>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {target && <AddToTripDialog event={target} open onClose={closeDialog} />}
+    </div>
+  )
 }

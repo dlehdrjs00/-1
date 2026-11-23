@@ -22,23 +22,34 @@ export function currentPath(): string {
 export function navigate(path: string, opts: { replace?: boolean } = {}) {
   const url = `#${path}`
   if (opts.replace) {
-    window.history.replaceState(null, '', url)
+    window.history.replaceState({ idx: currentIdx }, '', url)
     window.dispatchEvent(new HashChangeEvent('hashchange'))
   } else {
     window.location.hash = path
   }
 }
 
-// 앱 안에서 이동한 횟수. 0이면 외부에서 바로 들어온 것이므로 history.back() 대신 fallback 으로 이동
-let inAppNavCount = 0
+/*
+ * 앱 안 기록 위치(idx)를 history.state 에 남긴다.
+ * idx 가 0 이면 앱에 처음 들어온 항목이므로 '뒤로'는 history.back() 대신 fallback 으로 이동한다.
+ */
+let currentIdx = 0
 if (typeof window !== 'undefined') {
+  const st = window.history.state as { idx?: number } | null
+  if (typeof st?.idx === 'number') currentIdx = st.idx
+  else window.history.replaceState({ idx: 0 }, '')
   window.addEventListener('hashchange', () => {
-    inAppNavCount++
+    const s = window.history.state as { idx?: number } | null
+    if (typeof s?.idx === 'number') currentIdx = s.idx
+    else {
+      currentIdx += 1
+      window.history.replaceState({ idx: currentIdx }, '')
+    }
   })
 }
 
 export function goBack(fallback = '/events') {
-  if (inAppNavCount > 0) window.history.back()
+  if (currentIdx > 0) window.history.back()
   else navigate(fallback, { replace: true })
 }
 
