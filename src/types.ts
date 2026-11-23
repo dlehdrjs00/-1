@@ -105,7 +105,8 @@ export interface AppData {
 }
 
 /** 계산된 행사 진행 상태 */
-export type EventStatus = 'upcoming' | 'ongoing' | 'ended' | 'unknown'
+/** permanent: 기간 정보가 없는 상설 매장 (type 'shop') */
+export type EventStatus = 'upcoming' | 'ongoing' | 'ended' | 'unknown' | 'permanent'
 
 /** 계산된 예약 상태 */
 export type ReservationStatus =

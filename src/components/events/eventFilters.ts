@@ -99,7 +99,7 @@ export function matchesFilters(e: EventItem, f: EventFilters, status: EventStatu
 }
 
 /** 정렬 그룹: 진행 중·진행 예정 → 기간 확인 필요 → 종료 */
-const RANK: Record<EventStatus, number> = { ongoing: 0, upcoming: 0, unknown: 1, ended: 2 }
+const RANK: Record<EventStatus, number> = { ongoing: 0, upcoming: 0, permanent: 1, unknown: 1, ended: 2 }
 
 /** null 은 항상 뒤로 */
 function cmpNullableAsc(a: string | null, b: string | null): number {

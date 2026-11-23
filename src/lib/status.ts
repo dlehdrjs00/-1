@@ -5,7 +5,11 @@ import { nowInTimezone, todayInTimezone } from './date'
  * 행사 진행 상태. 행사 현지 시간대의 오늘 날짜로 판정.
  * 판정할 정보가 부족하면 'unknown'.
  */
-export function getEventStatus(e: Pick<EventItem, 'startDate' | 'endDate' | 'timezone'>, now: Date = new Date()): EventStatus {
+export function getEventStatus(
+  e: Pick<EventItem, 'startDate' | 'endDate' | 'timezone'> & { type?: EventItem['type'] },
+  now: Date = new Date(),
+): EventStatus {
+  if (isPermanentShop(e)) return 'permanent'
   const today = todayInTimezone(e.timezone, now)
   if (e.endDate && today > e.endDate) return 'ended'
   if (e.startDate && today < e.startDate) return 'upcoming'
@@ -34,6 +38,11 @@ export function getReservationStatus(
     return 'open'
   }
   return 'unknown'
+}
+
+/** 기간 정보가 없는 상설 매장: 기간 경고 대상이 아니다 */
+export function isPermanentShop(e: Pick<EventItem, 'startDate' | 'endDate'> & { type?: EventItem['type'] }): boolean {
+  return e.type === 'shop' && !e.startDate && !e.endDate
 }
 
 /** 화면 표시용: 값이 비어 있으면 '확인 필요' */

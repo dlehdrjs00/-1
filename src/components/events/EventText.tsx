@@ -1,5 +1,6 @@
 import type { EventItem } from '../../types'
 import { formatDateRange } from '../../lib/date'
+import { isPermanentShop } from '../../lib/status'
 
 /** 비어 있는 값 표시. 값을 지어내지 않고 '확인 필요'로 보여 준다. */
 export function Unknown({ label = '확인 필요' }: { label?: string }) {
@@ -12,7 +13,8 @@ export function TextOrUnknown({ value, label }: { value: string | null | undefin
 }
 
 /** 행사 기간. 한쪽이라도 모르면 해당 부분을 경고색으로 */
-export function PeriodText({ event }: { event: Pick<EventItem, 'startDate' | 'endDate'> }) {
+export function PeriodText({ event }: { event: Pick<EventItem, 'startDate' | 'endDate'> & { type?: EventItem['type'] } }) {
+  if (isPermanentShop(event)) return <>상설 (기간 없음)</>
   const text = formatDateRange(event.startDate, event.endDate)
   if (event.startDate && event.endDate) return <>{text}</>
   return <span className="unknown">{text}</span>

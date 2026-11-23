@@ -49,6 +49,7 @@ export const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
   ongoing: '진행 중',
   ended: '종료',
   unknown: '기간 확인 필요',
+  permanent: '상설 운영',
 }
 
 export const RESERVATION_STATUS_LABEL: Record<ReservationStatus, string> = {
@@ -67,6 +68,7 @@ export const EVENT_STATUS_TONE: Record<EventStatus, Tone> = {
   ongoing: 'success',
   ended: 'neutral',
   unknown: 'warning',
+  permanent: 'accent',
 }
 
 export const RESERVATION_STATUS_TONE: Record<ReservationStatus, Tone> = {

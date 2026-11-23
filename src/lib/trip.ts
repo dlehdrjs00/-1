@@ -1,8 +1,13 @@
 import type { DateOnly, EventItem, ItineraryItem, Trip } from '../types'
 import { eachDate } from './date'
+import { isPermanentShop } from './status'
 
 /** 해당 날짜가 행사 기간 안인지. 기간 정보가 부족하면 'unknown' */
-export function isDateInEventPeriod(e: Pick<EventItem, 'startDate' | 'endDate'>, date: DateOnly): boolean | 'unknown' {
+export function isDateInEventPeriod(
+  e: Pick<EventItem, 'startDate' | 'endDate'> & { type?: EventItem['type'] },
+  date: DateOnly,
+): boolean | 'unknown' {
+  if (isPermanentShop(e)) return true
   if (e.startDate && date < e.startDate) return false
   if (e.endDate && date > e.endDate) return false
   if (!e.startDate || !e.endDate) return 'unknown'
@@ -20,7 +25,8 @@ export function itemsByDate(trip: Trip, date: DateOnly): ItineraryItem[] {
 
 /** 여행 기간 밖으로 밀려난 일정 (여행 날짜를 수정했을 때 발생) */
 export function itemsOutsideTrip(trip: Trip): ItineraryItem[] {
-  return trip.items.filter((i) => i.date < trip.startDate || i.date > trip.endDate)
+  const shown = new Set(tripDates(trip))
+  return trip.items.filter((i) => !shown.has(i.date))
 }
 
 /** 같은 날짜에 같은 행사가 이미 있는지 */
