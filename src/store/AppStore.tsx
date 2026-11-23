@@ -1,5 +1,15 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react'
 import type { AppData, EventInput, EventItem, ItineraryItem, Trip, TripInput } from '../types'
 import { STORAGE_BACKUP_KEY, STORAGE_KEY } from '../constants'
 import { createInitialData } from '../data/initial'
@@ -38,6 +48,25 @@ export function loadFromStorage(): { data: AppData; notice: LoadNotice; corruptR
     return { data: createInitialData(), notice: 'corrupt_no_backup', corruptRaw: raw }
   }
   return { data: createInitialData(), notice: 'corrupt_reset' }
+}
+
+/*
+ * 저장 실패 여부는 React state 가 아니라 작은 외부 저장소로 관리한다.
+ * (저장은 변경 직후·첫 화면 표시 때 일어나는 부수 효과이므로, effect 안에서 setState 를 부르지 않기 위해)
+ */
+const saveStatus = { failed: false, listeners: new Set<() => void>() }
+function subscribeSaveStatus(fn: () => void) {
+  saveStatus.listeners.add(fn)
+  return () => {
+    saveStatus.listeners.delete(fn)
+  }
+}
+function persist(data: AppData) {
+  const failed = !saveToStorage(data)
+  if (failed !== saveStatus.failed) {
+    saveStatus.failed = failed
+    saveStatus.listeners.forEach((fn) => fn())
+  }
 }
 
 function saveToStorage(data: AppData): boolean {
@@ -152,15 +181,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [initial] = useState(loadFromStorage)
   const [data, setData] = useState<AppData>(initial.data)
   const [loadNotice, setLoadNotice] = useState<LoadNotice>(initial.notice)
-  const [saveError, setSaveError] = useState(false)
-  // 최신 값 참조 (콜백 안에서 동기적으로 결과를 돌려주기 위해). 모든 변경은 commit 을 거쳐 함께 갱신된다.
+  const saveError = useSyncExternalStore(subscribeSaveStatus, () => saveStatus.failed)
+  // 최신 값 참조 (콜백 안에서 동기적으로 결과를 돌려주기 위해). 모든 변경은 commit 을 거쳐 함께 갱신·저장된다.
   const dataRef = useRef(data)
 
+  // 첫 화면 표시 때 한 번 저장 (처음 실행 시 샘플·기본 여행을 저장하고, 손상 데이터는 초기 상태로 교체).
+  // 단, 백업에 실패한 손상 데이터는 사용자가 무언가 바꾸기 전까지 덮어쓰지 않는다.
   useEffect(() => {
-    // 백업에 실패한 손상 데이터는 사용자가 무언가 바꾸기 전까지 덮어쓰지 않는다
-    if (initial.notice === 'corrupt_no_backup' && data === initial.data) return
-    setSaveError(!saveToStorage(data))
-  }, [data, initial])
+    if (initial.notice === 'corrupt_no_backup') return
+    persist(initial.data)
+  }, [initial])
 
   // 다른 탭에서 변경된 경우 반영
   useEffect(() => {
@@ -183,6 +213,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const commit = useCallback((next: AppData) => {
     dataRef.current = next
     setData(next)
+    persist(next)
   }, [])
 
   const mapTrip = useCallback(
