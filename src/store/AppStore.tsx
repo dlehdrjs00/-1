@@ -5,7 +5,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -61,11 +60,51 @@ function subscribeSaveStatus(fn: () => void) {
     saveStatus.listeners.delete(fn)
   }
 }
-function persist(data: AppData) {
-  const failed = !saveToStorage(data)
+/** 앱 데이터를 저장하고 저장 실패 안내 상태를 갱신한다. 반환: 저장 성공 여부 */
+export function persist(data: AppData): boolean {
+  const ok = saveToStorage(data)
+  const failed = !ok
   if (failed !== saveStatus.failed) {
     saveStatus.failed = failed
     saveStatus.listeners.forEach((fn) => fn())
+  }
+  return ok
+}
+
+/** 테스트용: 저장 실패 안내 상태 */
+export function getSaveFailed(): boolean {
+  return saveStatus.failed
+}
+
+/** 저장 실패 시 사용자에게 보여 줄 공통 문구 */
+export const SAVE_FAILED_MESSAGE = '저장하지 못했어요. 브라우저 저장 공간을 확인한 뒤 다시 시도해 주세요.'
+
+/**
+ * 데이터 엔진: 변경은 **저장에 성공했을 때만** 반영한다 (트랜잭션 방식).
+ * 저장에 실패하면 현재 데이터가 그대로 남으므로, 화면에 보이는 데이터와 저장된 데이터가 어긋나지 않고
+ * 같은 동작을 다시 시도해도 중복으로 쌓이지 않는다.
+ */
+export interface DataEngine {
+  get(): AppData
+  /** 저장 후 반영. 반환: 저장 성공 여부 (실패하면 아무것도 바뀌지 않음) */
+  apply(next: AppData): boolean
+  /** 다른 탭이 이미 저장한 데이터를 반영 (다시 저장하지 않음) */
+  adopt(next: AppData): void
+}
+
+export function createDataEngine(initial: AppData, save: (d: AppData) => boolean = persist): DataEngine {
+  let current = initial
+  return {
+    get: () => current,
+    apply(next) {
+      if (next === current) return true
+      if (!save(next)) return false
+      current = next
+      return true
+    },
+    adopt(next) {
+      current = next
+    },
   }
 }
 
@@ -148,31 +187,45 @@ export interface AppStore {
   getTrip(id: string): Trip | undefined
   activeTrip: Trip | undefined
 
-  addEvent(input: EventInput): EventItem
-  updateEvent(id: string, input: EventInput): void
-  /** 반환: 삭제로 함께 제거된 일정 수 */
-  deleteEvent(id: string): number
+  /*
+   * 변경 함수 규칙: 저장에 성공했을 때만 반영한다.
+   * 저장에 실패하면 데이터는 그대로이고 null 또는 false 를 돌려준다 → 부르는 쪽은 성공 안내·화면 이동을 하지 않는다.
+   */
+
+  /**
+   * 새 행사 등록. 반환: 저장된 행사, 저장 실패 시 null.
+   * opts.id 를 주면 그 id 로 만든다. 같은 id 의 행사가 이미 있으면 새로 만들지 않고 그 행사를 갱신한다
+   * (재시도·중복 클릭에도 행사가 하나만 생기도록).
+   */
+  addEvent(input: EventInput, opts?: { id?: string }): EventItem | null
+  /** 반환: 저장 성공 여부 */
+  updateEvent(id: string, input: EventInput): boolean
+  /** 반환: 함께 제거된 일정 수, 저장 실패 시 null */
+  deleteEvent(id: string): number | null
   isFavorite(id: string): boolean
-  toggleFavorite(id: string): boolean // 반환: 토글 후 관심 여부
+  /** 반환: 바뀐 뒤 관심 여부, 저장 실패 시 null */
+  toggleFavorite(id: string): boolean | null
 
-  createTrip(input: TripInput): Trip
-  updateTrip(id: string, input: TripInput): void
-  deleteTrip(id: string): void
-  setActiveTrip(id: string): void
+  /** 반환: 만든 여행, 저장 실패 시 null */
+  createTrip(input: TripInput): Trip | null
+  updateTrip(id: string, input: TripInput): boolean
+  deleteTrip(id: string): boolean
+  setActiveTrip(id: string): boolean
 
-  addItineraryItem(tripId: string, item: Omit<ItineraryItem, 'id'>): ItineraryItem
-  updateItineraryItem(tripId: string, itemId: string, patch: Partial<Omit<ItineraryItem, 'id'>>): void
-  removeItineraryItem(tripId: string, itemId: string): void
-  /** 같은 날짜 안에서 위(-1)/아래(+1)로 이동 */
-  moveItineraryItem(tripId: string, itemId: string, direction: -1 | 1): void
+  /** 반환: 추가한 일정, 저장 실패 시 null */
+  addItineraryItem(tripId: string, item: Omit<ItineraryItem, 'id'>): ItineraryItem | null
+  updateItineraryItem(tripId: string, itemId: string, patch: Partial<Omit<ItineraryItem, 'id'>>): boolean
+  removeItineraryItem(tripId: string, itemId: string): boolean
+  /** 같은 날짜 안에서 위(-1)/아래(+1)로 이동. 반환: 저장 성공 여부 (움직일 수 없으면 바뀐 것 없이 true) */
+  moveItineraryItem(tripId: string, itemId: string, direction: -1 | 1): boolean
 
-  /** 반환: 삭제된 샘플 행사 수 */
-  deleteSamples(): number
+  /** 반환: 삭제된 샘플 행사 수, 저장 실패 시 null */
+  deleteSamples(): number | null
   sampleCount: number
-  /** 검증을 통과한 데이터로 전체 교체 */
-  replaceAll(data: AppData): void
-  /** 모든 데이터 초기화 (샘플·기본 여행 포함 처음 상태로) */
-  resetAll(): void
+  /** 검증을 통과한 데이터로 전체 교체. 반환: 저장 성공 여부 */
+  replaceAll(data: AppData): boolean
+  /** 모든 데이터 초기화 (샘플·기본 여행 포함 처음 상태로). 반환: 저장 성공 여부 */
+  resetAll(): boolean
 }
 
 const Ctx = createContext<AppStore | null>(null)
@@ -182,16 +235,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(initial.data)
   const [loadNotice, setLoadNotice] = useState<LoadNotice>(initial.notice)
   const saveError = useSyncExternalStore(subscribeSaveStatus, () => saveStatus.failed)
-  // 최신 값 참조 (콜백 안에서 동기적으로 결과를 돌려주기 위해). 모든 변경은 commit 을 거쳐 함께 갱신·저장된다.
-  const dataRef = useRef(data)
+  // 최신(=저장된) 값. 모든 변경은 commit → engine.apply 를 거쳐, 저장에 성공했을 때만 반영된다.
+  const [engine] = useState(() => createDataEngine(initial.data))
 
   // 첫 화면 표시 때 한 번 저장 (처음 실행 시 샘플·기본 여행을 저장하고, 손상 데이터는 초기 상태로 교체).
   // 단, 백업에 실패한 손상 데이터는 사용자가 무언가 바꾸기 전까지 덮어쓰지 않는다.
   // 자식 화면의 effect(예: 주소로 연 여행을 활성 여행으로)가 먼저 commit 했을 수 있으므로 최신 값을 저장한다.
   useEffect(() => {
     if (initial.notice === 'corrupt_no_backup') return
-    persist(dataRef.current)
-  }, [initial])
+    persist(engine.get())
+  }, [initial, engine])
 
   // 다른 탭에서 변경된 경우 반영
   useEffect(() => {
@@ -200,7 +253,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       try {
         const res = validateAppData(JSON.parse(e.newValue))
         if (res.ok) {
-          dataRef.current = res.data
+          engine.adopt(res.data)
           setData(res.data)
         }
       } catch {
@@ -209,17 +262,21 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
-  }, [])
+  }, [engine])
 
-  const commit = useCallback((next: AppData) => {
-    dataRef.current = next
-    setData(next)
-    persist(next)
-  }, [])
+  /** 저장에 성공했을 때만 화면 상태에 반영. 반환: 저장 성공 여부 */
+  const commit = useCallback(
+    (next: AppData): boolean => {
+      if (!engine.apply(next)) return false
+      setData(next)
+      return true
+    },
+    [engine],
+  )
 
   const mapTrip = useCallback(
-    (tripId: string, fn: (t: Trip) => Trip) => commit(ops.mapTrip(dataRef.current, tripId, fn)),
-    [commit],
+    (tripId: string, fn: (t: Trip) => Trip): boolean => commit(ops.mapTrip(engine.get(), tripId, fn)),
+    [commit, engine],
   )
 
   const store = useMemo<AppStore>(() => {
@@ -234,51 +291,50 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       getTrip: (id) => d.trips.find((t) => t.id === id),
       activeTrip: d.trips.find((t) => t.id === d.activeTripId) ?? d.trips[0],
 
-      addEvent(input) {
-        const id = newId('evt')
-        const next = ops.addEvent(dataRef.current, input, id)
-        commit(next)
-        return next.events.find((e) => e.id === id)!
+      addEvent(input, opts) {
+        const cur = engine.get()
+        const id = opts?.id ?? newId('evt')
+        // 같은 id 가 이미 있으면(이전 시도가 저장됨) 새로 만들지 않고 갱신 → 행사는 항상 하나
+        const next = cur.events.some((e) => e.id === id) ? ops.updateEvent(cur, id, input) : ops.addEvent(cur, input, id)
+        if (!commit(next)) return null
+        return next.events.find((e) => e.id === id) ?? null
       },
       updateEvent(id, input) {
-        commit(ops.updateEvent(dataRef.current, id, input))
+        return commit(ops.updateEvent(engine.get(), id, input))
       },
       deleteEvent(id) {
-        const cur = dataRef.current
+        const cur = engine.get()
         const removed = cur.trips.reduce((n, t) => n + t.items.filter((i) => i.eventId === id).length, 0)
-        commit(ops.deleteEvents(cur, new Set([id])))
-        return removed
+        return commit(ops.deleteEvents(cur, new Set([id]))) ? removed : null
       },
       isFavorite: (id) => d.favorites.includes(id),
       toggleFavorite(id) {
-        const next = ops.toggleFavorite(dataRef.current, id)
-        commit(next)
-        return next.favorites.includes(id)
+        const next = ops.toggleFavorite(engine.get(), id)
+        return commit(next) ? next.favorites.includes(id) : null
       },
 
       createTrip(input) {
         const id = newId('trip')
-        const next = ops.createTrip(dataRef.current, input, id)
-        commit(next)
-        return next.trips.find((t) => t.id === id)!
+        const next = ops.createTrip(engine.get(), input, id)
+        if (!commit(next)) return null
+        return next.trips.find((t) => t.id === id) ?? null
       },
       updateTrip(id, input) {
-        commit(ops.updateTrip(dataRef.current, id, input))
+        return commit(ops.updateTrip(engine.get(), id, input))
       },
       deleteTrip(id) {
-        commit(ops.deleteTrip(dataRef.current, id))
+        return commit(ops.deleteTrip(engine.get(), id))
       },
       setActiveTrip(id) {
-        commit({ ...dataRef.current, activeTripId: id })
+        return commit({ ...engine.get(), activeTripId: id })
       },
 
       addItineraryItem(tripId, item) {
         const created: ItineraryItem = { ...item, id: newId('item') }
-        mapTrip(tripId, (t) => ({ ...t, items: [...t.items, created] }))
-        return created
+        return mapTrip(tripId, (t) => ({ ...t, items: [...t.items, created] })) ? created : null
       },
       updateItineraryItem(tripId, itemId, patch) {
-        mapTrip(tripId, (t) => {
+        return mapTrip(tripId, (t) => {
           const target = t.items.find((i) => i.id === itemId)
           if (!target) return t
           const updated = { ...target, ...patch }
@@ -290,10 +346,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         })
       },
       removeItineraryItem(tripId, itemId) {
-        mapTrip(tripId, (t) => ({ ...t, items: t.items.filter((i) => i.id !== itemId) }))
+        return mapTrip(tripId, (t) => ({ ...t, items: t.items.filter((i) => i.id !== itemId) }))
       },
       moveItineraryItem(tripId, itemId, direction) {
-        mapTrip(tripId, (t) => {
+        return mapTrip(tripId, (t) => {
           const items = [...t.items]
           const idx = items.findIndex((i) => i.id === itemId)
           if (idx < 0) return t
@@ -309,19 +365,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       sampleCount: d.events.filter((e) => e.isSample).length,
       deleteSamples() {
-        const cur = dataRef.current
+        const cur = engine.get()
         const ids = new Set(cur.events.filter((e) => e.isSample).map((e) => e.id))
-        if (ids.size) commit(ops.deleteEvents(cur, ids))
-        return ids.size
+        if (!ids.size) return 0
+        return commit(ops.deleteEvents(cur, ids)) ? ids.size : null
       },
       replaceAll(next) {
-        commit(next)
+        return commit(next)
       },
       resetAll() {
-        commit(createInitialData())
+        return commit(createInitialData())
       },
     }
-  }, [data, saveError, loadNotice, initial, commit, mapTrip])
+  }, [data, saveError, loadNotice, initial, engine, commit, mapTrip])
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
 }
