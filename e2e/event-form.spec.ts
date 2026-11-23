@@ -50,7 +50,7 @@ test.describe('행사 등록 폼 검증', () => {
     // 새로고침해도 저장된 것이 없다
     await openRoute(page, '/manage')
     await page.reload()
-    await expect(page.getByRole('heading', { level: 2, name: /내 행사/ })).toContainText(String(SAMPLE_COUNT))
+    await expect(page.getByRole('heading', { level: 2, name: /전체 행사/ })).toContainText(String(SAMPLE_COUNT))
     await expect(page.getByText('작품 빠진 행사')).toHaveCount(0)
   })
 
