@@ -1,32 +1,60 @@
-# React + TypeScript + Vite
+# 덕질 여행 플래너
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+서브컬쳐 행사(팝업스토어, 콜라보 카페, 공연, 전시, 매장)를 모아 두고, 관심 행사를 여행 날짜별 일정에 배치하는 **개인용 웹앱**입니다.
+서버·로그인 없이 브라우저(localStorage)에 저장합니다.
 
-Currently, two official plugins are available:
+- 한국어 UI, 모바일 우선 반응형 (어두운 남색 + 보라색 포인트)
+- 관심 작품: 붕괴3rd, 원신, 붕괴: 스타레일, 젠레스 존 제로, 명조, 프로젝트 세카이, 명일방주, 스텔라이브 (+기타)
+- 첫 실행 시 가상 **샘플 행사 13개**와 예시 여행(2027-01-09~13 도쿄, 아사쿠사바시 근처 숙소)이 들어 있습니다.
+  샘플은 모두 `[샘플]` 표시가 있고, URL은 비어 있으며, 정보 관리에서 한 번에 삭제할 수 있습니다.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 실행
 
-## React Compiler
+요구: Node.js 20 이상
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev          # 개발 서버 → http://localhost:5173
+npm run build        # 타입 검사 + 정적 빌드 (dist/)
+npm run preview      # 빌드 결과 미리보기 → http://localhost:4173
+npm test             # 단위 테스트 (vitest)
+npm run e2e          # E2E 테스트 (Playwright, 모바일·데스크톱)
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+휴대폰에서 보려면 `npm run dev -- --host` 후 같은 Wi-Fi에서 표시된 네트워크 주소로 접속합니다.
+`dist/`는 정적 파일이라 해시 라우팅(`#/events`)으로 어떤 정적 호스팅에도 올릴 수 있습니다 (아직 배포하지 않음).
+
+## 화면
+
+| 경로 | 화면 |
+|---|---|
+| `#/events` | 행사 목록 — 작품·지역·유형·날짜(내 여행 기간) 필터, 검색, 진행 상태/예약 상태 별도 배지, 관심 저장 |
+| `#/events/:id` | 행사 상세 — 모든 항목, 모르는 값은 '확인 필요', 예약 시각은 현지 시간대 표기, 여행에 추가 |
+| `#/favorites` | 관심 행사 — 저장 취소(되돌리기), 여행에 추가 |
+| `#/trips`, `#/trips/:id` | 내 여행 — 여행 생성·수정(기간·숙소·시간대), 날짜별 일정, 시각·메모, 순서 변경, 삭제, 장소 직접 추가, 기간 밖·중복 안내 |
+| `#/manage` | 정보 관리 — 행사 목록/수정/삭제, 샘플 일괄 삭제, JSON 내보내기·불러오기, 저장 안내, 초기화 |
+| `#/manage/new`, `#/manage/edit/:id` | 행사 등록·수정 폼 |
+
+## 데이터 규칙
+
+- 날짜만 있는 값은 `YYYY-MM-DD`, 시각이 있는 값(예약 시작·종료)은 `YYYY-MM-DDTHH:mm` + 행사의 IANA 시간대(`Asia/Tokyo` 등)로 저장하고 "(일본 시간)"처럼 표시합니다.
+- 진행 상태(진행 예정/진행 중/종료/기간 확인 필요)와 예약 상태(예약 불필요/오픈 전/접수 중/마감/확인 필요)는 따로 계산합니다.
+  **'예약 접수 중'은 예약 필수이고 시작·종료 시각이 모두 확인됐을 때만** 표시합니다.
+- 불러오기(JSON)는 전체를 검증한 뒤에만 교체합니다. 오류가 하나라도 있으면 기존 데이터는 그대로 두고 오류 목록을 보여 줍니다.
+- 저장된 데이터가 손상돼 읽지 못하면 원본을 백업 키(`subcul-trip-planner:v1:corrupt-backup`)에 보관하고 초기 상태로 시작합니다.
+- 다른 기기와 자동 동기화되지 않습니다. 정보 관리에서 JSON으로 백업하세요.
+
+## 구조
+
+```
+src/
+  types.ts, constants.ts        데이터 타입, 작품·유형·시간대 상수
+  lib/                          날짜·상태 판정·여행 경고·검증·폼 변환 (순수 함수, 단위 테스트 대상)
+  store/AppStore.tsx            상태 + localStorage 저장 (ops: 순수 변경 함수)
+  router.tsx                    해시 라우터
+  components/                   공용 UI, 행사/여행/관리 컴포넌트, 여행에 추가 대화상자
+  pages/                        화면 6개 + 화면별 CSS
+  data/                         샘플 행사, 초기 데이터
+  __tests__/                    단위 테스트
+e2e/                            Playwright E2E 테스트
+```

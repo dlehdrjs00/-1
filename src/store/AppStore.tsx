@@ -143,15 +143,12 @@ export interface AppStore {
 const Ctx = createContext<AppStore | null>(null)
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
-  const initial = useRef<ReturnType<typeof loadFromStorage> | null>(null)
-  if (initial.current === null) initial.current = loadFromStorage()
-
-  const [data, setData] = useState<AppData>(initial.current.data)
-  const [loadNotice, setLoadNotice] = useState<LoadNotice>(initial.current.notice)
+  const [initial] = useState(loadFromStorage)
+  const [data, setData] = useState<AppData>(initial.data)
+  const [loadNotice, setLoadNotice] = useState<LoadNotice>(initial.notice)
   const [saveError, setSaveError] = useState(false)
-  // 최신 값 참조 (콜백 안에서 동기적으로 결과를 돌려주기 위해)
+  // 최신 값 참조 (콜백 안에서 동기적으로 결과를 돌려주기 위해). 모든 변경은 commit 을 거쳐 함께 갱신된다.
   const dataRef = useRef(data)
-  dataRef.current = data
 
   useEffect(() => {
     setSaveError(!saveToStorage(data))
@@ -163,7 +160,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       if (e.key !== STORAGE_KEY || e.newValue === null) return
       try {
         const res = validateAppData(JSON.parse(e.newValue))
-        if (res.ok) setData(res.data)
+        if (res.ok) {
+          dataRef.current = res.data
+          setData(res.data)
+        }
       } catch {
         /* ignore */
       }
